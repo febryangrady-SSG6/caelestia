@@ -26,7 +26,8 @@
         "hiddenApps": [
             "foot",
             "footclient",
-            "foot-server"
+            "foot-server",
+            "systemsettings"
         ]
     },
     "paths": {

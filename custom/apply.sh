@@ -190,6 +190,15 @@ if command -v konsole >/dev/null 2>&1 && command -v kwriteconfig6 >/dev/null 2>&
     kwriteconfig6 --file kdeglobals --group General --key TerminalApplication konsole
     kwriteconfig6 --file kdeglobals --group General --key TerminalService org.kde.konsole.desktop
 fi
+if [[ -f "$SCRIPT_DIR/configs/caelestia-nexus.desktop" ]]; then
+    log "Installing Caelestia Settings (Nexus) launcher entry"
+    install -Dm644 "$SCRIPT_DIR/configs/caelestia-nexus.desktop" \
+        "${XDG_DATA_HOME:-$HOME/.local/share}/applications/caelestia-nexus.desktop"
+    if [[ -f "$REPO_ROOT/assets/caelestia.svg" ]]; then
+        install -Dm644 "$REPO_ROOT/assets/caelestia.svg" \
+            "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps/caelestia-settings.svg"
+    fi
+fi
 
 # 9. Cap systemd-logind pre-sleep delay lock wait + apply AMD AM5/ASRock wakeup fixes if present.
 if [[ -f "$SCRIPT_DIR/configs/10-sleep-delay.conf" ]]; then

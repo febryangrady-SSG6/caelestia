@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Caelestia Settings
+GenericName=Nexus Settings
+Comment=Configure Caelestia shell, theme, panels, and behavior
+Exec=caelestia-shell-ipc call nexus open
+Icon=caelestia-settings
+Categories=Qt;Settings;
+Keywords=caelestia;nexus;settings;preferences;theme;wallpaper;bar;launcher;
+StartupNotify=false

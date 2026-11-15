@@ -25,6 +25,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/BarComponentContext.qml" \
+        "$QS_TARGET/modules/bar/popouts/BarComponentContext.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
         "$QS_TARGET/modules/bar/popouts/Greeter.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/sidebar/AiAssistant.qml" \

@@ -78,6 +78,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `Tooltip`'s `parent` binding checked `parentItem.anchors.fill !== undefined`, which is `true` for every QML `Item` (`anchors.fill` defaults to `null`, not `undefined`). That caused `parent` to stop at `target.parent` (such as the `46px`-tall `Row` in `RegionSelection.qml`), clamping tooltips like `Full Screen Screenshot` and `Close` directly on top of the hovered button where the `Popup` stole hover, closed, restored hover, and flickered continuously.
    - **Fix:** Walk up to the topmost ancestor item (`while (p && p.parent) p = p.parent`), guard `clamp` upper bounds with `Math.max(padding, ...)`, compute initial position synchronously alongside `Qt.callLater`, and hide the tooltip if `target.visible` becomes `false`.
 
+9. **`0009-fix-bar-left-align-labels-in-BarComponentContext-pop.patch`**
+   - **File:** `shell/modules/bar/popouts/BarComponentContext.qml`
+   - **Problem:** `RowLayout` inside `ActionRow` stretched to the wider row without any child setting `Layout.fillWidth: true`, causing Qt `RowLayout` to expand the spacing between the `settings` icon and shorter labels like `Dock settings` instead of left-aligning them with `Elements & Modules`.
+   - **Fix:** Added `Layout.fillWidth: true` on `StyledText` inside `ActionRow`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

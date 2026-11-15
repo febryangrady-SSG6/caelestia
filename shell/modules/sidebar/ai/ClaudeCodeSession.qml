@@ -2,18 +2,21 @@ import QtQuick
 import Quickshell.Io
 import qs.utils
 import "claudecode.js" as ClaudeCode
+import "antigravity.js" as Antigravity
 
-// One run of the Claude Code CLI for one reply. It parses the CLI's stream-json
-// output and reports typed updates; where they go is up to the owner, which
-// also destroys the session once it has ended.
+// One run of a CLI AI backend (Claude Code or Antigravity) for one reply. It
+// parses the CLI's stream-json output and reports typed updates; where they go
+// is up to the owner, which also destroys the session once it has ended.
 Process {
     id: root
 
     // The message this run writes to.
     property string chatId
     property string msgId
+    property bool isAntigravity: false
+    readonly property var adapter: isAntigravity ? Antigravity : ClaudeCode
     property bool stopped: false
-    readonly property var stream: ClaudeCode.createState()
+    property var stream: null
     // Live status of the run, shown while its chat is open.
     property real startedAt: 0
     property int outputTokens: 0
@@ -32,6 +35,12 @@ Process {
     // reply: { text, tools, usage, sessionId }
     signal completed(reply: var)
     signal ended
+
+    function ensureStream(): var {
+        if (!stream)
+            stream = adapter.createState();
+        return stream;
+    }
 
     function stop(): void {
         stopped = true;
@@ -56,20 +65,20 @@ Process {
     }
 
     stdout: SplitParser {
-        onRead: line => root.dispatch(ClaudeCode.handleLine(root.stream, line))
+        onRead: line => root.dispatch(root.adapter.handleLine(root.ensureStream(), line))
     }
     stderr: SplitParser {
         onRead: line => {
             const t = (line || "").trim();
             if (t === "")
                 return;
-            root.stream.errAcc += t + "\n";
-            Logger.log("[ClaudeCode] " + t);
+            root.ensureStream().errAcc += t + "\n";
+            Logger.log((root.isAntigravity ? "[Antigravity] " : "[ClaudeCode] ") + t);
         }
     }
 
     onExited: code => {
-        const reply = ClaudeCode.handleExit(root.stream, code, root.stopped);
+        const reply = root.adapter.handleExit(root.ensureStream(), code, root.stopped);
         if (reply)
             completed(reply);
         ended();

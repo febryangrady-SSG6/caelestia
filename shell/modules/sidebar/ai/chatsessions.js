@@ -322,7 +322,7 @@ function historyRows(sessions, query, now) {
             }
         }
 
-        var isClaudeCode = s.provider === "claude-code" || !!s.claudeCodeSessionId;
+        var isClaudeCode = s.provider === "claude-code" || s.provider === "antigravity" || !!s.claudeCodeSessionId || !!s.antigravitySessionId;
         var ts = chatTimestamp(s);
         rows.push({
             "chatId": String(s.id),

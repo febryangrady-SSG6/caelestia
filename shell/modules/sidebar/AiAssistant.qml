@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -19,9 +20,19 @@ import qs.utils
 import "ai"
 import "ai/attachments.js" as AttachmentPaths
 import "ai/claudecode.js" as ClaudeCode
+import "ai/antigravity.js" as Antigravity
 
 Item {
     id: root
+
+    Settings {
+        id: antigravitySettings
+
+        category: "AntigravityAI"
+        property string model: "default"
+        property string effort: "default"
+        property string cachedModelsJson: ""
+    }
 
     ChatStore {
         id: chatStore
@@ -47,7 +58,9 @@ Item {
 
     onProviderChanged: {
         cancelRateLimitRetry();
-        if (isOpenaiCompat)
+        if (isAntigravity && antigravityModelsList.length <= 1)
+            fetchAntigravityModels(false);
+        else if (isOpenaiCompat)
             fetchOpenaiCompatModels(provider);
         else if (isClaude)
             fetchClaudeModels();
@@ -68,6 +81,7 @@ Item {
     // go stale each time a vendor releases a model.
     function refreshAllModels() {
         fetchOllamaModels();
+        fetchAntigravityModels(false);
         fetchClaudeCodeModels();
         fetchClaudeModels();
         const compat = root.openaiCompatProviders;
@@ -79,6 +93,7 @@ Item {
 
     Component.onCompleted: {
         loadAllKeys();
+        detectAntigravityCli();
         refreshAllModels();
         loadHistory();
         AiToolCalls.onAllToolsFinished = (results, imageB64) => {
@@ -147,10 +162,80 @@ Item {
     }
 
     property var claudeCodeModelsList: ["default"]
+    property bool antigravityAvailable: true
+    property string antigravityResolvedBin: "/usr/bin/agy"
+    property var antigravityModelsList: {
+        try {
+            var arr = JSON.parse(antigravitySettings.cachedModelsJson || "[]");
+            if (Array.isArray(arr) && arr.length > 0)
+                return arr;
+        } catch (e) {}
+        return ["default"];
+    }
+    property bool fetchingAntigravityModels: false
+    property real lastAntigravityModelFetch: 0
 
     readonly property var claudeCodeEffortOptions: {
-        var lv = ClaudeCode.effortLevelsFor(activeModel());
+        var lv = cliAdapter.effortLevelsFor(activeModel());
         return lv.length > 0 ? ["default"].concat(lv) : [];
+    }
+
+    readonly property string cliEffort: isAntigravity
+        ? (antigravitySettings.effort || "default")
+        : (GlobalConfig.ai.claudeCodeEffort || "default")
+
+    function antigravityBinPath() {
+        return antigravityResolvedBin || "agy";
+    }
+
+    function detectAntigravityCli() {
+        var qml =
+            "import QtQuick\n" +
+            "import Quickshell.Io\n" +
+            "Process {\n" +
+            "    id: dp\n" +
+            "    command: [\"sh\", \"-c\", \"command -v agy\"]\n" +
+            "    stdout: StdioCollector { onStreamFinished: { var p = (text || \"\").trim(); if (p !== \"\") { root.antigravityResolvedBin = p; root.antigravityAvailable = true; } } }\n" +
+            "    onExited: code => { if (code !== 0) root.antigravityAvailable = false; dp.destroy(); }\n" +
+            "}";
+        try {
+            var o = Qt.createQmlObject(qml, root, "agyDetectProc");
+            o.running = true;
+        } catch (e) {}
+    }
+
+    function fetchAntigravityModels(force) {
+        if (!antigravityAvailable || fetchingAntigravityModels)
+            return;
+        if (!force && antigravityModelsList.length > 1 && (Date.now() - lastAntigravityModelFetch) < 300000)
+            return;
+        fetchingAntigravityModels = true;
+        var commandStr = JSON.stringify([antigravityBinPath(), "models"]);
+        var qml =
+            "import QtQuick\n" +
+            "import Quickshell.Io\n" +
+            "Process {\n" +
+            "    id: amp\n" +
+            "    command: " + commandStr + "\n" +
+            "    stdout: StdioCollector { onStreamFinished: root.applyAntigravityModels(text || \"\"); }\n" +
+            "    onExited: code => { root.fetchingAntigravityModels = false; Qt.callLater(() => amp.destroy()); }\n" +
+            "}";
+        try {
+            var o = Qt.createQmlObject(qml, root, "agyModelsProc");
+            o.running = true;
+        } catch (e) {
+            fetchingAntigravityModels = false;
+            Logger.log("[AI] antigravity model fetch error: " + e.message);
+        }
+    }
+
+    function applyAntigravityModels(text) {
+        var parsed = Antigravity.parseModelList(text);
+        if (parsed.length > 1) {
+            antigravityModelsList = parsed;
+            antigravitySettings.cachedModelsJson = JSON.stringify(parsed);
+            lastAntigravityModelFetch = Date.now();
+        }
     }
 
     function fetchClaudeCodeModels() {
@@ -186,13 +271,19 @@ Item {
 
     readonly property bool isClaudeCode: provider === "claude-code"
 
-    // Running Claude Code replies by chat id. They keep going while another chat
-    // is open.
+    readonly property bool isAntigravity: provider === "antigravity"
+
+    readonly property bool isCliProvider: isClaudeCode || isAntigravity
+
+    readonly property var cliAdapter: isAntigravity ? Antigravity : ClaudeCode
+
+    // Running CLI replies (Claude Code or Antigravity) by chat id. They keep going
+    // while another chat is open.
     property var claudeCodeRuns: ({})
 
     readonly property var currentClaudeCodeProc: claudeCodeRuns[currentChatId] ?? null
 
-    // Working directory and permission mode of the current Claude Code chat. Both are
+    // Working directory and permission mode of the current CLI chat. Both are
     // stored per chat (a CLI session only resumes from the directory it was created
     // in); a new chat inherits whatever was selected last.
     readonly property string claudeCodeChatCwd: chatStore.currentProp("claudeCodeCwd") || Quickshell.env("HOME") || "."
@@ -203,6 +294,10 @@ Item {
     readonly property var claudeCodePermissionModes: GlobalConfig.ai.claudeCodeSkipPermissions
         ? ["bypassPermissions", "acceptEdits", "auto", "plan", "default"]
         : ["acceptEdits", "auto", "plan", "default"]
+
+    readonly property var cliPermissionModes: isAntigravity
+        ? claudeCodePermissionModes.filter(m => m !== "auto")
+        : claudeCodePermissionModes
 
     readonly property var claudeCodeSidebarAllowedTools: ["Bash", "WebFetch", "WebSearch", "Read"]
 
@@ -225,9 +320,13 @@ Item {
         dir = (dir || "").replace(/\/+$/, "") || "/";
         if (dir === claudeCodeChatCwd)
             return;
-        // The old session lives under the previous directory's project, so --resume
+        // The old session lives under the previous directory's project, so resuming
         // would fail; the next send seeds a fresh session with the transcript instead.
-        chatStore.setChatProps(currentChatId, { "claudeCodeCwd": dir, "claudeCodeSessionId": "" });
+        chatStore.setChatProps(currentChatId, {
+            "claudeCodeCwd": dir,
+            "claudeCodeSessionId": "",
+            "antigravitySessionId": ""
+        });
     }
 
     function setClaudeCodePermissionMode(mode) {
@@ -255,16 +354,23 @@ Item {
 
     readonly property bool canSend: inputArea.text.length > 0 || attachments.pending.length > 0
 
-    // Open the current Claude Code session in a terminal (`claude --resume`).
+    // Open the current CLI session in a terminal (`agy --conversation` / `claude --resume`).
     function openClaudeCodeInTerminal() {
-        var sid = claudeCodeSessionFor(currentChatId);
-        var dir = activeClaudeConfigDir();
+        var useAgy = root.isAntigravity;
+        var sid = cliSessionFor(currentChatId, useAgy);
         var inner = "cd " + shellQuote(claudeCodeCwd()) + " && ";
-        if (dir && dir !== "")
-            inner += "CLAUDE_CONFIG_DIR=" + shellQuote(dir) + " ";
-        inner += "exec " + shellQuote(claudeCodeBinPath());
-        if (sid !== "")
-            inner += " --resume " + shellQuote(sid);
+        if (!useAgy) {
+            var dir = activeClaudeConfigDir();
+            if (dir && dir !== "")
+                inner += "CLAUDE_CONFIG_DIR=" + shellQuote(dir) + " ";
+            inner += "exec " + shellQuote(claudeCodeBinPath());
+            if (sid !== "")
+                inner += " --resume " + shellQuote(sid);
+        } else {
+            inner += "exec " + shellQuote(antigravityBinPath());
+            if (sid !== "")
+                inner += " --conversation " + shellQuote(sid);
+        }
         var term = GlobalConfig.ai.loginTerminal || "konsole";
         Launch.exec([term, "-e", "sh", "-lc", inner]);
     }
@@ -304,7 +410,7 @@ Item {
     Timer {
         interval: 1000
         repeat: true
-        running: root.isClaudeCode && root.isTyping && root.claudeCodeStartedAt > 0
+        running: root.isCliProvider && root.isTyping && root.claudeCodeStartedAt > 0
         onTriggered: root.claudeCodeElapsed = Math.floor((Date.now() - root.claudeCodeStartedAt) / 1000)
     }
 
@@ -312,7 +418,7 @@ Item {
     Timer {
         interval: 4000
         repeat: true
-        running: root.isClaudeCode && root.isTyping && !root.claudeCodeToolRunning
+        running: root.isCliProvider && root.isTyping && !root.claudeCodeToolRunning
         onTriggered: root.currentActionText = root.randomThinkingVerb()
     }
 
@@ -321,10 +427,11 @@ Item {
     property bool loadingSuggestions: false
 
     function fetchPromptSuggestions() {
-        if (!isClaudeCode || loadingSuggestions)
+        if (!isCliProvider || loadingSuggestions)
             return;
         loadingSuggestions = true;
         promptSuggestions = [];
+        var useAgy = root.isAntigravity;
 
         var lines = [];
         var msgs = chatStore.current().messages;
@@ -356,7 +463,9 @@ Item {
                 prompt += "The user has started typing: \"" + draft + "\"\n\n";
         }
 
-        var cmd = [claudeCodeBinPath(), "-p", prompt, "--output-format", "json"];
+        var cmd = useAgy
+            ? [antigravityBinPath(), "-p", prompt, "--output-format", "json", "--model", "gemini-3.8-flash-low"]
+            : [claudeCodeBinPath(), "-p", prompt, "--output-format", "json"];
         var qml =
             "import QtQuick\n" +
             "import Quickshell.Io\n" +
@@ -364,8 +473,8 @@ Item {
             "    id: sp\n" +
             "    command: " + JSON.stringify(cmd) + "\n" +
             "    workingDirectory: " + JSON.stringify(claudeCodeCwd()) + "\n" +
-            claudeCodeEnvSnippet() +
-            "    stdout: StdioCollector { onStreamFinished: root.applyPromptSuggestions(text || \"\"); }\n" +
+            (useAgy ? "" : claudeCodeEnvSnippet()) +
+            "    stdout: StdioCollector { onStreamFinished: root.applyPromptSuggestions(text || \"\", " + (useAgy ? "true" : "false") + "); }\n" +
             "    onExited: code => { root.loadingSuggestions = false; sp.destroy(); }\n" +
             "}";
         try {
@@ -377,11 +486,12 @@ Item {
         }
     }
 
-    function applyPromptSuggestions(text) {
+    function applyPromptSuggestions(text, isAgy) {
         loadingSuggestions = false;
         var resultStr = "";
         try {
-            resultStr = JSON.parse(text).result || "";
+            var parsed = JSON.parse(text);
+            resultStr = (isAgy ? parsed.response : parsed.result) || "";
         } catch (e) {
             return;
         }
@@ -401,20 +511,29 @@ Item {
         }
     }
 
-    // The CLI session a chat resumes, if it was started with the active account.
-    function claudeCodeSessionFor(chatId) {
+    // The CLI session a chat resumes.
+    function cliSessionFor(chatId, useAgy) {
         var s = chatStore.session(chatId);
-        if (!s || (s.claudeCodeSessionAccount || "") !== (GlobalConfig.ai.activeClaudeAccount || ""))
+        if (!s)
+            return "";
+        if (useAgy)
+            return s.antigravitySessionId || "";
+        if ((s.claudeCodeSessionAccount || "") !== (GlobalConfig.ai.activeClaudeAccount || ""))
             return "";
         return s.claudeCodeSessionId || "";
     }
 
-    function setClaudeCodeSession(chatId, sid) {
-        if (sid)
+    function setCliSession(chatId, sid, useAgy) {
+        if (!sid)
+            return;
+        if (useAgy) {
+            chatStore.setChatProps(chatId, { "antigravitySessionId": sid });
+        } else {
             chatStore.setChatProps(chatId, {
                 "claudeCodeSessionId": sid,
                 "claudeCodeSessionAccount": GlobalConfig.ai.activeClaudeAccount || ""
             });
+        }
     }
 
     readonly property bool isOpenaiCompat: root.openaiCompatProviders.indexOf(provider) !== -1
@@ -606,6 +725,8 @@ Item {
     readonly property bool needsApiKey: isClaude || isOpenaiCompat
 
     function activeModel() {
+        if (isAntigravity)
+            return antigravitySettings.model || "default";
         if (isClaudeCode)
             return GlobalConfig.ai.defaultClaudeCodeModel || "default";
         if (isClaude)
@@ -632,6 +753,8 @@ Item {
 
     readonly property var providerList: {
         var l = [];
+        if (antigravityAvailable || provider === "antigravity")
+            l.push("antigravity");
         if (GlobalConfig.ai.enableOllama)
             l.push("ollama");
         if (GlobalConfig.ai.enableClaudeCode)
@@ -656,6 +779,8 @@ Item {
     }
 
     function providerLabel(p) {
+        if (p === "antigravity")
+            return "Antigravity";
         if (p === "claude-code")
             return "Claude Code";
         if (p === "claude")
@@ -909,10 +1034,13 @@ Item {
     function generateClaudeCodeTitleAsync(chatId, firstMessage) {
         if (!firstMessage)
             return;
+        var useAgy = root.isAntigravity;
         var safeMsg = firstMessage.substring(0, 200);
         var prompt = "Output ONLY a concise 2-4 word title for the following message. No quotes, no trailing punctuation, no explanation.\n\nMessage: " + safeMsg;
 
-        var cmd = [claudeCodeBinPath(), "-p", prompt, "--output-format", "json"];
+        var cmd = useAgy
+            ? [antigravityBinPath(), "-p", prompt, "--output-format", "json", "--model", "gemini-3.8-flash-low"]
+            : [claudeCodeBinPath(), "-p", prompt, "--output-format", "json"];
         var commandStr = JSON.stringify(cmd);
         var cwdStr = JSON.stringify(claudeCodeCwd());
         var chatIdStr = JSON.stringify(chatId);
@@ -923,23 +1051,27 @@ Item {
             "    id: tproc\n" +
             "    command: " + commandStr + "\n" +
             "    workingDirectory: " + cwdStr + "\n" +
-            claudeCodeEnvSnippet() +
-            "    stdout: StdioCollector { onStreamFinished: root.handleClaudeCodeTitle(" + chatIdStr + ", text || \"\", tproc); }\n" +
+            (useAgy ? "" : claudeCodeEnvSnippet()) +
+            "    stdout: StdioCollector { onStreamFinished: root.handleClaudeCodeTitle(" + chatIdStr + ", text || \"\", tproc, " + (useAgy ? "true" : "false") + "); }\n" +
             "    onExited: code => { if (code !== 0) tproc.destroy(); }\n" +
             "}";
         try {
             var obj = Qt.createQmlObject(qml, root, "claudeCodeTitleProc");
             obj.running = true;
         } catch (e) {
-            Logger.log("[AI] claude-code title process error: " + e.message);
+            Logger.log("[AI] CLI title process error: " + e.message);
         }
     }
 
-    function handleClaudeCodeTitle(chatId, text, proc) {
+    function handleClaudeCodeTitle(chatId, text, proc, isAgy) {
         try {
             var parsed = JSON.parse(text);
-            if (parsed && parsed.result && !parsed.is_error)
-                applyGeneratedTitle(chatId, String(parsed.result));
+            var titleRaw = isAgy ? parsed.response : parsed.result;
+            var errored = isAgy
+                ? (parsed.status && String(parsed.status).toUpperCase() !== "SUCCESS")
+                : Boolean(parsed.is_error);
+            if (parsed && titleRaw && !errored)
+                applyGeneratedTitle(chatId, String(titleRaw));
         } catch (e) {}
         if (proc)
             proc.destroy();
@@ -966,14 +1098,16 @@ Item {
         currentActionText = randomThinkingVerb();
         const reply = startReply();
 
-        var sid = claudeCodeSessionFor(reply.chatId);
+        var useAgy = root.isAntigravity;
+        var adapter = useAgy ? Antigravity : ClaudeCode;
+        var sid = cliSessionFor(reply.chatId, useAgy);
 
         // Fresh session (new chat, the active account changed, or the working
         // directory changed) → seed it with the prior transcript so the conversation
         // carries over.
         var promptToSend = promptText;
         if (sid === "") {
-            var transcript = ClaudeCode.transcript(chatStore.session(reply.chatId).messages);
+            var transcript = adapter.transcript(chatStore.session(reply.chatId).messages);
             if (transcript !== "")
                 promptToSend = transcript;
         }
@@ -981,27 +1115,30 @@ Item {
         var props = {
             "chatId": reply.chatId,
             "msgId": reply.msgId,
+            "isAntigravity": useAgy,
             "workingDirectory": claudeCodeCwd(),
-            "command": ClaudeCode.replyCommand({
-                "bin": claudeCodeBinPath(),
+            "command": adapter.replyCommand({
+                "bin": useAgy ? antigravityBinPath() : claudeCodeBinPath(),
                 "prompt": promptToSend,
                 "attachments": attachments,
                 "permissionMode": claudeCodePermissionMode,
                 "bypassAllowed": GlobalConfig.ai.claudeCodeSkipPermissions,
                 "allowedTools": claudeCodeSidebarAllowedTools,
-                "model": GlobalConfig.ai.defaultClaudeCodeModel,
-                "effort": GlobalConfig.ai.claudeCodeEffort,
+                "model": activeModel(),
+                "effort": cliEffort,
                 "sessionId": sid
             })
         };
-        var configDir = activeClaudeConfigDir();
-        if (configDir !== "")
-            props.environment = { "CLAUDE_CONFIG_DIR": configDir };
+        if (!useAgy) {
+            var configDir = activeClaudeConfigDir();
+            if (configDir !== "")
+                props.environment = { "CLAUDE_CONFIG_DIR": configDir };
+        }
 
         var proc = claudeCodeSessionComponent.createObject(root, props);
         if (!proc) {
             chatStore.update(reply.chatId, reply.msgId, {
-                "text": "⚠️ Failed to launch Claude Code: " + claudeCodeSessionComponent.errorString(),
+                "text": "⚠️ Failed to launch " + (useAgy ? "Antigravity" : "Claude Code") + ": " + claudeCodeSessionComponent.errorString(),
                 "isFinished": true
             });
             isTyping = false;
@@ -1069,7 +1206,7 @@ Item {
         var text = reply.text;
         if (text === "" && reply.tools.length === 0)
             text = proc.stopped ? qsTr("(stopped)") : "(no output)";
-        setClaudeCodeSession(proc.chatId, reply.sessionId);
+        setCliSession(proc.chatId, reply.sessionId, proc.isAntigravity);
         chatStore.update(proc.chatId, proc.msgId, {
             "text": text,
             "toolsJson": reply.tools.length > 0 ? JSON.stringify(reply.tools) : "",
@@ -1281,7 +1418,7 @@ Item {
     function generateChatTitleAsync(chatId, firstMessage) {
         if (!firstMessage) return;
 
-        if (root.isClaudeCode) {
+        if (root.isCliProvider) {
             root.generateClaudeCodeTitleAsync(chatId, firstMessage);
             return;
         }
@@ -1389,7 +1526,7 @@ Item {
     }
 
     function sendPrompt(promptText, isSystemToolResult = false, base64Image = null, toolName = "", isRetry = false) {
-        var attachmentPaths = (!isSystemToolResult && !isRetry && root.isClaudeCode) ? attachments.pending.map(a => a.path) : [];
+        var attachmentPaths = (!isSystemToolResult && !isRetry && root.isCliProvider) ? attachments.pending.map(a => a.path) : [];
         if (!promptText.trim() && !base64Image && attachmentPaths.length === 0) return;
         attachments.take();
 
@@ -1442,8 +1579,8 @@ Item {
             currentActionText = "Thinking...";
         }
 
-        if (root.isClaudeCode) {
-            root.sendClaudeCode(ClaudeCode.withAttachmentList(promptText, attachmentPaths), attachmentPaths);
+        if (root.isCliProvider) {
+            root.sendClaudeCode(root.cliAdapter.withAttachmentList(promptText, attachmentPaths), attachmentPaths);
             return;
         }
 
@@ -2036,7 +2173,10 @@ Item {
 
                  active: menuItems.find(m => m.modelData === root.activeModel()) ?? menuItems[0] ?? null
                  menu.onItemSelected: item => {
-                     if (root.isClaudeCode) {
+                     if (root.isAntigravity) {
+                         antigravitySettings.model = item.modelData;
+                         antigravitySettings.effort = "default";
+                     } else if (root.isClaudeCode) {
                          GlobalConfig.ai.defaultClaudeCodeModel = item.modelData;
                          GlobalConfig.ai.claudeCodeEffort = "default";
                      } else if (root.isClaude)
@@ -2057,6 +2197,8 @@ Item {
                      id: modelVariants
 
                      model: {
+                         if (root.isAntigravity)
+                             return root.antigravityModelsList;
                          if (root.isClaudeCode)
                              return root.claudeCodeModelsList;
                          if (root.isClaude)
@@ -2079,11 +2221,14 @@ Item {
 
                  type: SplitButton.Tonal
                  verticalPadding: 4
-                 visible: root.isClaudeCode && root.claudeCodeEffortOptions.length > 0
+                 visible: root.isCliProvider && root.claudeCodeEffortOptions.length > 0
 
-                 active: menuItems.find(m => m.modelData === (GlobalConfig.ai.claudeCodeEffort || "default")) ?? menuItems[0] ?? null
+                 active: menuItems.find(m => m.modelData === root.cliEffort) ?? menuItems[0] ?? null
                  menu.onItemSelected: item => {
-                     GlobalConfig.ai.claudeCodeEffort = item.modelData;
+                     if (root.isAntigravity)
+                         antigravitySettings.effort = item.modelData;
+                     else
+                         GlobalConfig.ai.claudeCodeEffort = item.modelData;
                  }
 
                  menuItems: effortVariants.instances
@@ -2136,15 +2281,15 @@ Item {
                  }
              }
 
-             // Permission mode for this chat (Claude Code).
+             // Permission mode for this chat (CLI providers).
              SplitButton {
                  id: permissionSelector
 
                  type: SplitButton.Tonal
                  verticalPadding: 4
-                 visible: root.isClaudeCode
+                 visible: root.isCliProvider
 
-                 active: menuItems.find(m => m.modelData === ClaudeCode.effectivePermissionMode(root.claudeCodePermissionMode, GlobalConfig.ai.claudeCodeSkipPermissions)) ?? menuItems[0] ?? null
+                 active: menuItems.find(m => m.modelData === root.cliAdapter.effectivePermissionMode(root.claudeCodePermissionMode, GlobalConfig.ai.claudeCodeSkipPermissions)) ?? menuItems[0] ?? null
                  menu.onItemSelected: item => root.setClaudeCodePermissionMode(item.modelData)
 
                  menuItems: permissionVariants.instances
@@ -2156,7 +2301,7 @@ Item {
                  Variants {
                      id: permissionVariants
 
-                     model: root.claudeCodePermissionModes
+                     model: root.cliPermissionModes
 
                      delegate: MenuItem {
                          required property string modelData
@@ -2166,11 +2311,11 @@ Item {
                  }
              }
 
-             // Working directory for this chat (Claude Code).
+             // Working directory for this chat (CLI providers).
              StyledRect {
                  id: cwdButton
 
-                 visible: root.isClaudeCode
+                 visible: root.isCliProvider
                  implicitWidth: Math.min(cwdRow.implicitWidth + Tokens.padding.medium * 2, 220)
                  implicitHeight: permissionSelector.height
                  radius: Tokens.rounding.full
@@ -2209,14 +2354,14 @@ Item {
                      id: cwdDialog
 
                      selectFolder: true
-                     title: qsTr("Claude Code working directory")
+                     title: root.isAntigravity ? qsTr("Antigravity working directory") : qsTr("Claude Code working directory")
                      onAccepted: path => root.setClaudeCodeCwd(path)
                  }
              }
 
-             // Continue this chat's session in a terminal (claude --resume).
+             // Continue this chat's session in a terminal (agy --conversation / claude --resume).
              StyledRect {
-                 visible: root.isClaudeCode
+                 visible: root.isCliProvider
                  implicitWidth: permissionSelector.height
                  implicitHeight: permissionSelector.height
                  radius: Tokens.rounding.full
@@ -2323,7 +2468,7 @@ Item {
                          Item {
                              id: statusFooter
 
-                             readonly property bool shown: isThinking || (root.isClaudeCode && root.isTyping)
+                             readonly property bool shown: isThinking || (root.isCliProvider && root.isTyping)
                              readonly property real maxBubbleWidth: listView.width * 0.85
                              readonly property real naturalWidth: footerCol.implicitWidth + Tokens.padding.medium * 2 + 8
                              // Widest the bubble has been during this reply. The verb, the
@@ -2367,20 +2512,20 @@ Item {
                                          spacing: Tokens.spacing.small
 
                                          LoadingIndicator {
-                                             visible: !root.isClaudeCode
+                                             visible: !root.isCliProvider
                                              width: 20
                                              height: 20
                                              color: Colours.palette.m3primary
                                          }
 
-                                         // Claude Code: the CLI's twinkling star.
+                                         // CLI providers: the twinkling star.
                                          StyledText {
                                              id: starGlyph
 
                                              readonly property var frames: ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"]
                                              property int frame: 0
 
-                                             visible: root.isClaudeCode
+                                             visible: root.isCliProvider
                                              // The frames come from different fallback fonts with
                                              // different line heights; a fixed box keeps the row
                                              // (and the bubble) from bouncing with every frame.
@@ -2493,9 +2638,9 @@ Item {
                                              }
                                          }
                                      }
-                                     // Claude Code: elapsed time and output tokens on their own line.
+                                     // CLI providers: elapsed time and output tokens on their own line.
                                      StyledText {
-                                         visible: root.isClaudeCode && root.isTyping
+                                         visible: root.isCliProvider && root.isTyping
                                          width: Math.min(implicitWidth, statusFooter.maxBubbleWidth - Tokens.padding.medium * 2 - 8)
                                          leftPadding: 20 + Tokens.spacing.small
                                          text: root.formatElapsed(root.claudeCodeElapsed)
@@ -2657,7 +2802,7 @@ Item {
                      anchors.right: parent.right
                      z: 11
                      spacing: Tokens.spacing.small
-                     visible: root.isClaudeCode && root.promptSuggestions.length > 0
+                     visible: root.isCliProvider && root.promptSuggestions.length > 0
 
                      RowLayout {
                          Layout.fillWidth: true
@@ -2730,7 +2875,7 @@ Item {
                      }
                  }
 
-                 // Files attached to the next message (Claude Code).
+                 // Files attached to the next message (CLI providers).
                  Flow {
                      id: attachmentStrip
 
@@ -2740,7 +2885,7 @@ Item {
                      anchors.right: parent.right
                      z: 10
                      spacing: Tokens.spacing.small
-                     visible: root.isClaudeCode && attachments.pending.length > 0
+                     visible: root.isCliProvider && attachments.pending.length > 0
 
                      Repeater {
                          model: attachments.pending
@@ -2852,7 +2997,7 @@ Item {
 
                      DropArea {
                          anchors.fill: parent
-                         enabled: root.isClaudeCode
+                         enabled: root.isCliProvider
                          onDropped: drop => {
                              if (!drop.hasUrls)
                                  return;
@@ -2904,7 +3049,7 @@ Item {
                                              root.sendPrompt(inputArea.text);
                                              inputArea.clear();
                                          }
-                                     } else if (root.isClaudeCode && event.matches(StandardKey.Paste)) {
+                                     } else if (root.isCliProvider && event.matches(StandardKey.Paste)) {
                                          // An image on the clipboard becomes an attachment;
                                          // anything else is pasted as text as usual.
                                          event.accepted = true;
@@ -2914,9 +3059,9 @@ Item {
                              }
                          }
 
-                         // Attach a file (Claude Code).
+                         // Attach a file (CLI providers).
                          Item {
-                             visible: root.isClaudeCode
+                             visible: root.isCliProvider
                              Layout.preferredWidth: visible ? 32 : 0
                              Layout.preferredHeight: 32
 
@@ -2938,7 +3083,7 @@ Item {
                          }
 
                          Item {
-                             visible: root.isClaudeCode
+                             visible: root.isCliProvider
                              Layout.preferredWidth: visible ? 32 : 0
                              Layout.preferredHeight: 32
 

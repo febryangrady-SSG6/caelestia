@@ -87,6 +87,29 @@ Item {
         MediaItem {
             id: two
         }
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: parent.width - Tokens.padding.large * 2
+            spacing: Tokens.spacing.small
+            visible: !root.mediaPath
+
+            MaterialIcon {
+                Layout.alignment: Qt.AlignHCenter
+                text: "waving_hand"
+                color: Colours.palette.m3onSurfaceVariant
+                fontStyle: Tokens.font.icon.extraLarge
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: qsTr("No greeter media set.\nRight-click greeter → Greeter settings to choose a GIF/image.")
+                color: Colours.palette.m3onSurfaceVariant
+                font.pointSize: Tokens.font.body.small.pointSize * root.fontScale
+            }
+        }
     }
 
     Item {

@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as Controls
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
@@ -257,11 +257,20 @@ MouseArea {
             const item = root.attachTo;
             if (!item || !root.parent)
                 return 0;
-            let off = root.attachSideX === Menu.Left ? 0 : item.width;
-            if (root.thisSideX === Menu.Right)
-                off -= width;
-            const pt = item.mapToItem(root.parent, off, 0);
-            return (pt ? pt.x : 0) + root.marginX;
+            const attachOff = root.attachSideX === Menu.Left ? 0 : item.width;
+            const pt = item.mapToItem(root.parent, attachOff, 0);
+            const anchorX = (pt ? pt.x : 0) + root.marginX;
+            const fullW = menu.implicitWidth;
+            const parentW = root.parent.width;
+            if (root.thisSideX === Menu.Right) {
+                const clampedAnchorX = parentW >= fullW && parentW > 0
+                    ? Math.max(fullW, Math.min(anchorX, parentW))
+                    : anchorX;
+                return clampedAnchorX - menu.width;
+            }
+            if (parentW >= fullW && parentW > 0)
+                return Math.max(0, Math.min(anchorX, parentW - fullW));
+            return Math.max(0, anchorX);
         }
         y: {
             watcher.transform;
@@ -270,7 +279,7 @@ MouseArea {
                 return 0;
             let off = root.attachSideY === Menu.Top ? 0 : item.height;
             if (root.thisSideY === Menu.Bottom)
-                off -= height;
+                off -= menu.height;
             const pt = item.mapToItem(root.parent, 0, off);
             return (pt ? pt.y : 0) + root.marginY;
         }
@@ -334,7 +343,7 @@ MouseArea {
 
                 interactive: contentHeight > height
 
-                ScrollBar.vertical: StyledScrollBar {
+                Controls.ScrollBar.vertical: StyledScrollBar {
                     flickable: flickable
                 }
 
@@ -446,7 +455,7 @@ MouseArea {
 
                 interactive: contentHeight > height
 
-                ScrollBar.vertical: StyledScrollBar {
+                Controls.ScrollBar.vertical: StyledScrollBar {
                     flickable: submenuFlickable
                 }
 

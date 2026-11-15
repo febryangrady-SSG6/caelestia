@@ -83,6 +83,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `RowLayout` inside `ActionRow` stretched to the wider row without any child setting `Layout.fillWidth: true`, causing Qt `RowLayout` to expand the spacing between the `settings` icon and shorter labels like `Dock settings` instead of left-aligning them with `Elements & Modules`.
    - **Fix:** Added `Layout.fillWidth: true` on `StyledText` inside `ActionRow`.
 
+10. **`0010-fix-launcher-add-vertical-padding-and-align-selectio.patch`**
+   - **File:** `shell/modules/launcher/items/AppTile.qml`
+   - **Problem:** `AppTile`'s selection highlight `StyledRect` had `anchors.margins: Tokens.spacing.extraSmall` (`4px` inset) while `tileArea` (`StateLayer`) filled the whole tile (`0px` inset), and `baseIconSize` + `content.y` consumed the full `92px` tile height with zero bottom padding, causing two-line app labels (e.g., `Helium Browser`) to touch/overlap the bottom border of the selection box.
+   - **Fix:** Unified `StyledRect` with `tileArea` at `anchors.fill: parent` and added balanced vertical padding (`_verticalPadding` top/bottom) with centered `content.y` so multi-line labels stay cleanly padded inside the highlight box.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

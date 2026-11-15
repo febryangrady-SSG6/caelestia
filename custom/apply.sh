@@ -23,6 +23,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/components/controls/Tooltip.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/utilities/cards/CaptureCard.qml" \
         "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/AppTile.qml" \
+        "$QS_TARGET/modules/launcher/items/AppTile.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/BarComponentContext.qml" \

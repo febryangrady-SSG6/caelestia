@@ -35,8 +35,11 @@ StyledRect {
 
     Connections {
         function onUtilitiesChanged(): void {
-            if (!root.visibilities.utilities)
+            if (!root.visibilities.utilities) {
                 root.expanded = false;
+                recordSplitBtn.expanded = false;
+                shotSplitBtn.expanded = false;
+            }
         }
 
         target: root.visibilities

@@ -154,9 +154,14 @@ MouseArea {
     }
 
     onExpandedChanged: {
+        if (expanded && root.attachTo && !root.attachTo.visible) {
+            expanded = false;
+            return;
+        }
         if (expanded) {
             closeTimer.stop();
         } else {
+            submenuOpen = false;
             submenuRow = null;
             submenuItems = [];
         }
@@ -168,6 +173,18 @@ MouseArea {
             revealIn.start();
         else
             revealOut.start();
+    }
+
+    Connections {
+        function onVisibleChanged(): void {
+            if (root.expanded && !root.attachTo?.visible) {
+                closeTimer.stop();
+                root.submenuOpen = false;
+                root.expanded = false;
+            }
+        }
+
+        target: root.attachTo
     }
 
     parent: {

@@ -123,6 +123,10 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `resolveImageUrl` stripped `image://icon/` from notification icons (e.g. `image://icon/system-software-update`), passing a bare icon name into QML `Image { source: ... }` which failed trying to open `file:///.../lockscreen/components/system-software-update`.
    - **Fix:** Return `""` from `resolveImageUrl` for `image://icon/` and scheme-less non-path strings, and add `resolveImageIcon` so `Kirigami.Icon` renders the themed icon fallback cleanly.
 
+18. **`0018-feat-lockscreen-use-standard-neutral-grey-color-sche.patch`**
+   - **File:** `src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml`
+   - **Summary:** Adds `standardGrey` (default `true`) and `applySchemeData` helper, keeping the active lockscreen wallpaper intact while switching the lockscreen palette defaults (`clSurface`, `clSurfaceFg`, `clSurfaceContainer`, `clPrimary`, `clTerms`, etc.) to standard neutral grey unless `lock.standardGrey` is explicitly set to `false` in `shell.json`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
@@ -130,7 +134,7 @@ bash ~/caelestia-kde/custom/apply.sh
 | Area | What `custom/apply.sh` configures | Reason |
 | :--- | :--- | :--- |
 | **KDE color contrast** | Syncs patched `src/bin/caelestia-color` to `~/.local/bin/caelestia-color` and re-applies active named scheme | Ensures `[Colors:Selection]` and `[Colors:Complementary]` contrast fixes apply to named schemes (e.g. `gruvbox/soft/dark`). |
-| **Lockscreen QML modules** | Symlinks `/usr/lib/qt6/qml/Caelestia` and `/usr/lib/qt6/qml/M3Shapes` -> `~/.local/lib/qt6/qml/...` | `kscreenlocker_greet` can miss user `QML2_IMPORT_PATH`, leading to a black screen on `Meta+L`. |
+| **Lockscreen & SDDM QML modules** | Installs world-readable system copies of `/usr/lib/qt6/qml/Caelestia` and `/usr/lib/qt6/qml/M3Shapes` from `~/.local/lib/qt6/qml/...` | Both `kscreenlocker_greet` and user `sddm` (which cannot traverse `0700` `~/.local`) resolve `Caelestia` and `M3Shapes` cleanly without a black screen. |
 | **KWin workspace tracker** | Installs `kwin_workspace_tracker.so` to `/usr/lib/qt6/plugins/kwin/effects/plugins/` if built | Ensures KWin loads the workspace tracker effect cleanly. |
 | **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |
 | **Terminal (`foot`)** | Installs `custom/configs/foot.ini` (`shell=bash`) | Prevents desktop **Open Terminal** / `foot` from failing on unconfigured `fish`. |
@@ -138,6 +142,7 @@ bash ~/caelestia-kde/custom/apply.sh
 | **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, dashboard media GIF (`kurukuru.gif`), and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
 | **Default browser** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` if installed | Uses Helium Browser as default browser. |
 | **Sleep delay & AMD AM5 wakeup** | Installs `custom/configs/10-sleep-delay.conf` -> `/etc/systemd/logind.conf.d/10-sleep-delay.conf` (`InhibitDelayMaxSec=2`) and, on `A620M-HDV/M.2+` / `GP17` hosts, installs `90-disable-usb-wakeup.rules` (`1d57:fa60` dongle + `0000:00:08.1`/`11:00.3`/`11:00.4`/`0e:00.0`) and `disable-acpi-wakeup.service` (`GP17`, `XHC0`, `XHC1`, `XH00`) while keeping wired keyboard `XHC2`/`5-1` and Power Button enabled | Prevents immediate spurious S3 wakeups (`pm_wakeup_irq=36` on `GP17`/`XHC0`/`1d57:fa60`) and caps `kwin_wayland` pre-sleep delay lock hangs at 2s instead of 5s. |
+| **SDDM login theme** | Installs `custom/sddm-theme/` -> `/usr/share/sddm/themes/caelestia-lockscreen/`, copies current wallpaper & avatar, writes `/etc/sddm.conf.d/zz-caelestia.conf` (`Current=caelestia-lockscreen`, `GreeterEnvironment=QML_XHR_ALLOW_FILE_READ=1`), and enables `sddm.service` | Matches the SDDM login screen visually to the standard-grey Caelestia lockscreen (`caelestia.desktop`) with the same layout, blur card, clock, greeting, password pill, session switcher, and power controls. |
 
 ---
 

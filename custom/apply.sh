@@ -90,14 +90,17 @@ if [[ -f "$REPO_ROOT/src/bin/caelestia-color" ]]; then
     fi
 fi
 
-# 2. Ensure kscreenlocker_greet (which ignores user QML2_IMPORT_PATH on some systems)
-#    can resolve Caelestia and M3Shapes QML modules under /usr/lib/qt6/qml.
+# 2. Ensure kscreenlocker_greet and SDDM (which runs as user 'sddm' and cannot traverse
+#    0700 ~/.local) can resolve Caelestia and M3Shapes QML modules under /usr/lib/qt6/qml.
 for mod in Caelestia M3Shapes; do
     user_mod="$HOME/.local/lib/qt6/qml/$mod"
     sys_mod="/usr/lib/qt6/qml/$mod"
-    if [[ -d "$user_mod" && ! -e "$sys_mod" ]]; then
-        log "Linking $sys_mod -> $user_mod (sudo required)"
-        sudo ln -sfn "$user_mod" "$sys_mod"
+    if [[ -d "$user_mod" ]]; then
+        log "Installing system-wide QML module copy $sys_mod"
+        "${SUDO[@]}" rm -rf "$sys_mod"
+        "${SUDO[@]}" cp -a "$user_mod" "$sys_mod"
+        "${SUDO[@]}" chown -R root:root "$sys_mod"
+        "${SUDO[@]}" chmod -R a+rX "$sys_mod"
     fi
 done
 
@@ -194,6 +197,60 @@ if [[ "$board_name" == "A620M-HDV/M.2+" ]] || grep -qE '^GP17[[:space:]]' /proc/
         /etc/systemd/system/disable-acpi-wakeup.service
     "${SUDO[@]}" systemctl daemon-reload
     "${SUDO[@]}" systemctl enable --now disable-acpi-wakeup.service
+fi
+
+# 9b. Install Caelestia lockscreen-matched SDDM theme if SDDM is installed.
+if [[ -d "$SCRIPT_DIR/sddm-theme" ]] && command -v sddm >/dev/null 2>&1; then
+    sddm_theme_dir="/usr/share/sddm/themes/caelestia-lockscreen"
+    log "Installing SDDM theme -> $sddm_theme_dir"
+    "${SUDO[@]}" mkdir -p "$sddm_theme_dir"
+    "${SUDO[@]}" cp -a "$SCRIPT_DIR/sddm-theme/." "$sddm_theme_dir/"
+
+    wall_src=""
+    if command -v kreadconfig6 >/dev/null 2>&1; then
+        wall_cfg="$(kreadconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image 2>/dev/null || true)"
+        wall_cfg="${wall_cfg#file://}"
+        [[ -f "$wall_cfg" ]] && wall_src="$wall_cfg"
+    fi
+    if [[ -z "$wall_src" && -f "${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/wallpaper/current" ]]; then
+        wall_src="$(readlink -f "${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/wallpaper/current" 2>/dev/null || true)"
+    fi
+    if [[ -n "$wall_src" && -f "$wall_src" ]]; then
+        "${SUDO[@]}" install -Dm644 "$wall_src" "$sddm_theme_dir/assets/background"
+    fi
+
+    avatar_src=""
+    for candidate in "$HOME/.face" "$HOME/.face.icon" "/var/lib/AccountsService/icons/$USER"; do
+        if [[ -f "$candidate" ]]; then
+            avatar_src="$candidate"
+            break
+        fi
+    done
+    if [[ -n "$avatar_src" ]]; then
+        "${SUDO[@]}" install -Dm644 "$avatar_src" "$sddm_theme_dir/assets/avatar"
+        "${SUDO[@]}" install -Dm644 "$avatar_src" "/usr/share/sddm/faces/$USER.face.icon"
+    fi
+
+    "${SUDO[@]}" chown -R root:root "$sddm_theme_dir"
+    "${SUDO[@]}" chmod -R a+rX "$sddm_theme_dir"
+
+    "${SUDO[@]}" mkdir -p /etc/sddm.conf.d
+    "${SUDO[@]}" tee /etc/sddm.conf.d/zz-caelestia.conf >/dev/null <<'EOF'
+[General]
+GreeterEnvironment=QML_XHR_ALLOW_FILE_READ=1
+
+[Theme]
+Current=caelestia-lockscreen
+EOF
+    "${SUDO[@]}" chmod 644 /etc/sddm.conf.d/zz-caelestia.conf
+
+    if ! systemctl is-enabled --quiet sddm.service 2>/dev/null; then
+        if systemctl is-enabled --quiet plasmalogin.service 2>/dev/null; then
+            log "Switching display-manager service from plasmalogin to sddm (takes effect next reboot)"
+            "${SUDO[@]}" systemctl disable plasmalogin.service || true
+        fi
+        "${SUDO[@]}" systemctl enable sddm.service
+    fi
 fi
 
 # 10. Reload KWin and restart caelestia-shell if running inside a user session.

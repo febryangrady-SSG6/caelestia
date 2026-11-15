@@ -131,13 +131,18 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Files:** `shell/utils/Launch.qml`, `shell/modules/launcher/items/CalcItem.qml`, `shell/modules/nexus/pages/UpdatesPage.qml`
    - **Summary:** Adds `Launch.terminalExecPrefix(baseTerminal)` and routes `terminalCommand`, `CalcItem` (`qalc`), and `UpdatesPage` through it so Konsole receives `-e` before inline commands while bare terminal launches (`Meta+Return`, desktop context menu) run `["konsole"]` cleanly.
 
+20. **`0020-fix-color-ensure-Konsole-and-terminal-OSC-ANSI-color.patch`**
+   - **File:** `src/bin/caelestia-color`
+   - **Problem:** `cmd_konsole_scheme` and `terminal-sequences` mapped ANSI slots 6, 10, 12, and 13 to `onPrimaryContainer` / `onTertiaryContainer`, which invert to `#000000` on light containers in `dynamic` dark schemes (rendering numbers in `qalc` invisible black on dark `#131313` backgrounds).
+   - **Fix:** Adds `resolve_terminal_palette(colours)` using WCAG `contrast_ratio` (>= 4.5 for colors 1–7, 9–15; >= 3.0 for dim black 8) with fallbacks to `term0..term15` / `primary` / `secondary` / `tertiary` / `onSurface`, and applies it in both `cmd_konsole_scheme` and `cmd_terminal_sequences`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
 
 | Area | What `custom/apply.sh` configures | Reason |
 | :--- | :--- | :--- |
-| **KDE color contrast** | Syncs patched `src/bin/caelestia-color` to `~/.local/bin/caelestia-color` and re-applies active named scheme | Ensures `[Colors:Selection]` and `[Colors:Complementary]` contrast fixes apply to named schemes (e.g. `gruvbox/soft/dark`). |
+| **KDE & Konsole contrast** | Syncs patched `src/bin/caelestia-color` to `~/.local/bin/caelestia-color` and re-applies active scheme (with `CAELESTIA_NO_DEFER=1`) | Ensures `[Colors:Selection]` / `[Colors:Complementary]` and Konsole / OSC ANSI terminal contrast fixes apply to both dynamic and named schemes. |
 | **Lockscreen & SDDM QML modules** | Installs world-readable system copies of `/usr/lib/qt6/qml/Caelestia` and `/usr/lib/qt6/qml/M3Shapes` from `~/.local/lib/qt6/qml/...` | Both `kscreenlocker_greet` and user `sddm` (which cannot traverse `0700` `~/.local`) resolve `Caelestia` and `M3Shapes` cleanly without a black screen. |
 | **KWin workspace tracker** | Installs `kwin_workspace_tracker.so` to `/usr/lib/qt6/plugins/kwin/effects/plugins/` if built | Ensures KWin loads the workspace tracker effect cleanly. |
 | **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |

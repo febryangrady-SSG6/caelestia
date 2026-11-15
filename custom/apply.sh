@@ -84,12 +84,14 @@ if [[ -f "$REPO_ROOT/src/bin/caelestia-color" ]]; then
         scheme_name="$("$CAELESTIA_COLOR_BIN" scheme get -n 2>/dev/null || true)"
         scheme_flavour="$("$CAELESTIA_COLOR_BIN" scheme get -f 2>/dev/null || true)"
         scheme_mode="$("$CAELESTIA_COLOR_BIN" scheme get -m 2>/dev/null || true)"
-        if [[ -n "$scheme_name" && "$scheme_name" != "dynamic" ]]; then
+        scheme_variant="$("$CAELESTIA_COLOR_BIN" scheme get -v 2>/dev/null || true)"
+        if [[ -n "$scheme_name" ]]; then
             scheme_args=(-n "$scheme_name")
             [[ -n "$scheme_flavour" ]] && scheme_args+=(-f "$scheme_flavour")
             [[ -n "$scheme_mode" ]] && scheme_args+=(-m "$scheme_mode")
-            log "Re-applying active KDE colour scheme ($scheme_name) with contrast fix"
-            "$CAELESTIA_COLOR_BIN" scheme set "${scheme_args[@]}" >/dev/null 2>&1 || true
+            [[ -n "$scheme_variant" ]] && scheme_args+=(-v "$scheme_variant")
+            log "Re-applying active KDE & Konsole colour scheme ($scheme_name) with contrast fix"
+            CAELESTIA_NO_DEFER=1 "$CAELESTIA_COLOR_BIN" scheme set "${scheme_args[@]}" >/dev/null 2>&1 || true
         fi
     fi
 fi

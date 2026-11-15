@@ -38,7 +38,9 @@ Item {
     // a large font or a long name can no longer push the block past the tile.
     readonly property int lineHeight: Math.max(1, Math.round(nameMetrics.height))
     readonly property int labelHeight: root.lineHeight * root.labelLines
-    readonly property int baseIconSize: Math.min(Math.round(root.implicitWidth * 0.5), Math.max(16, root.implicitHeight - root.labelHeight - Tokens.spacing.extraSmall * 2))
+    readonly property int _baseLabelHeight: root.lineHeight * 2
+    readonly property int _verticalPadding: Math.round((Tokens.padding.extraSmall + Tokens.padding.small) / 2)
+    readonly property int baseIconSize: Math.min(Math.round(root.implicitWidth * 0.44), Math.max(16, root.implicitHeight - root._baseLabelHeight - root._verticalPadding * 2 - Tokens.spacing.extraSmall))
 
     implicitWidth: Tokens.sizes.launcher.browseTileWidth
     implicitHeight: Tokens.sizes.launcher.browseTileHeight
@@ -52,7 +54,6 @@ Item {
 
     StyledRect {
         anchors.fill: parent
-        anchors.margins: Tokens.spacing.extraSmall
         radius: Tokens.rounding.large
         color: Colours.palette.m3primary
         opacity: root.selected ? 0.14 : 0
@@ -110,7 +111,7 @@ Item {
                 id: content
 
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: Tokens.spacing.extraSmall
+                y: Math.max(root._verticalPadding, Math.floor((page.height - height) / 2))
                 spacing: Tokens.spacing.extraSmall
 
                 Item {

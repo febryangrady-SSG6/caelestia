@@ -731,38 +731,77 @@ def relative_luminance(color: str) -> float:
     return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
 
 
-def cmd_kde_selection(scheme_file: str, colors_file: str) -> int:
-    """Set a dynamic scheme's KDE selection text to a colour that reads on the selection.
+def contrast_ratio(first: str, second: str) -> float:
+    """WCAG contrast ratio between two `RRGGBB` colours."""
+    l1, l2 = relative_luminance(first), relative_luminance(second)
+    return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
 
-    The KDE template speaks the selection's text in `secondary_fixed`, which a Material
-    palette renders light, on a `primary` background a dark mode also renders light, so a
-    dynamic scheme's selected item is washed out. The template is vendored, and a named
-    scheme's text colour belongs to its file, so only a dynamic scheme is rewritten here,
-    against the bar it draws: black on a light `primary`, white on a dark one. The
-    palette's own `onPrimary` is a tint of the primary and reads as muddy on the bar.
+
+def cmd_kde_selection(scheme_file: str, colors_file: str) -> int:
+    """Fix low-contrast KDE colour roles after rendering the vendored Matugen template.
+
+    The vendored KDE template renders `[Colors:Selection]` `ForegroundNormal` and
+    `ForegroundLink` in `secondary_fixed` on a `primary` background (washed out in dark
+    schemes, both dynamic and named), and `[Colors:Complementary]` `ForegroundNormal` in
+    `on_primary_container` on `surface` (near-black on near-black in several named
+    schemes). Because the template is vendored, unreadable roles are repaired here for
+    every scheme.
     """
     data = json.loads(pathlib.Path(scheme_file).read_text(encoding="utf-8"))
-    if data.get("name") != "dynamic":
-        return 0
+    colours = data.get("colours", {})
 
-    primary = str(data.get("colours", {}).get("primary", "")).lstrip("#").strip()
-    if len(primary) != 6:
-        return 0
-
-    # 0.179 is where black and white swap places on the WCAG contrast curve: above it
-    # black reads better on the bar, below it white does.
-    foreground = "000000" if relative_luminance(primary) > 0.179 else "ffffff"
+    primary = str(colours.get("primary", "")).lstrip("#").strip()
+    surface = str(colours.get("surface", "")).lstrip("#").strip()
+    on_surface = str(colours.get("onSurface", "")).lstrip("#").strip()
 
     path = pathlib.Path(colors_file)
     lines = path.read_text(encoding="utf-8").splitlines()
-    in_selection = False
+    section = ""
+    changed = False
+
+    if len(primary) == 6:
+        light_primary = relative_luminance(primary) > 0.179
+        sel_fg = "000000" if light_primary else "ffffff"
+        sel_inactive = "262626" if light_primary else "d9d9d9"
+    else:
+        sel_fg = sel_inactive = ""
+
+    comp_fg = ""
+    if len(surface) == 6:
+        if len(on_surface) == 6 and contrast_ratio(surface, on_surface) >= 4.5:
+            comp_fg = on_surface
+        else:
+            comp_fg = "000000" if relative_luminance(surface) > 0.179 else "ffffff"
+
     for index, line in enumerate(lines):
-        if line.startswith("["):
-            in_selection = line.strip() == "[Colors:Selection]"
-        elif in_selection and line.startswith("ForegroundNormal="):
-            lines[index] = f"ForegroundNormal=#{foreground}"
-            atomic_write(path, "\n".join(lines) + "\n")
-            return 0
+        stripped = line.strip()
+        if stripped.startswith("["):
+            section = stripped
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        val_hex = value.strip().lstrip("#")
+
+        if section == "[Colors:Selection]" and sel_fg:
+            if key == "ForegroundNormal":
+                new_line = f"ForegroundNormal=#{sel_fg}"
+                if line != new_line:
+                    lines[index] = new_line
+                    changed = True
+            elif key == "ForegroundLink" and (len(val_hex) != 6 or contrast_ratio(primary, val_hex) < 4.5):
+                lines[index] = f"ForegroundLink=#{sel_fg}"
+                changed = True
+            elif key == "ForegroundInactive" and (len(val_hex) != 6 or contrast_ratio(primary, val_hex) < 4.5):
+                lines[index] = f"ForegroundInactive=#{sel_inactive}"
+                changed = True
+        elif section == "[Colors:Complementary]" and comp_fg and key == "ForegroundNormal":
+            if len(val_hex) != 6 or contrast_ratio(surface, val_hex) < 4.5:
+                lines[index] = f"ForegroundNormal=#{comp_fg}"
+                changed = True
+
+    if changed:
+        atomic_write(path, "\n".join(lines) + "\n")
     return 0
 
 

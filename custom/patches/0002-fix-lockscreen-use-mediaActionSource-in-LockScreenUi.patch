@@ -1,0 +1,28 @@
+From c0626b783f209647db33f7e59c48a254bb216738 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:17:59 +0700
+Subject: [PATCH 2/4] fix(lockscreen): use mediaActionSource in LockScreenUi
+ media actions
+
+---
+ .../caelestia.desktop/contents/lockscreen/LockScreenUi.qml    | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml b/src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml
+index 8cdc6af6..6fb6a40f 100644
+--- a/src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml
++++ b/src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml
+@@ -280,8 +280,8 @@ Item {
+         readonly property var actions: ["previous", "playPause", "next"]
+ 
+         function sendAction(action) {
+-            if (root.actions.includes(action))
+-                root.send("mpris " + action);
++            if (mediaActionSource.actions.includes(action))
++                mediaActionSource.send("mpris " + action);
+         }
+ 
+         onReplied: mprisSource.send("mpris status")
+-- 
+2.56.1
+

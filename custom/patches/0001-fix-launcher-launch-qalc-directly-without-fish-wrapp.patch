@@ -1,0 +1,25 @@
+From 0ef807dba502309f5f29a3fd25615695b8b0fc8b Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:17:59 +0700
+Subject: [PATCH 1/4] fix(launcher): launch qalc directly without fish wrapper
+
+---
+ shell/modules/launcher/items/CalcItem.qml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/shell/modules/launcher/items/CalcItem.qml b/shell/modules/launcher/items/CalcItem.qml
+index 71b6a080..dcc377f8 100644
+--- a/shell/modules/launcher/items/CalcItem.qml
++++ b/shell/modules/launcher/items/CalcItem.qml
+@@ -78,7 +78,7 @@ Item {
+                 id: stateLayer
+ 
+                 onClicked: {
+-                    Quickshell.execDetached([...GlobalConfig.general.apps.terminal, "fish", "-C", `exec qalc -i '${root.math}'`]);
++                    Quickshell.execDetached([...GlobalConfig.general.apps.terminal, "qalc", "-i", root.math]);
+                     root.list.visibilities.launcher = false;
+                 }
+ 
+-- 
+2.56.1
+

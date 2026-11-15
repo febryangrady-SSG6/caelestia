@@ -1,0 +1,85 @@
+# Personal `caelestia-kde` Fork & Reinstall Guide
+
+This directory documents and automates every customization and fix applied on top of upstream [`ladybug-me/caelestia-kde`](https://github.com/ladybug-me/caelestia-kde) so that:
+1. Reinstalling on a fresh Arch / CachyOS + KDE Plasma system is a single command sequence.
+2. Any future AI agent or user can immediately see **what** was changed, **why**, and **where**.
+
+---
+
+## Quick Reinstall (Fresh OS)
+
+### Option A — Install directly from this fork
+```bash
+git clone --recurse-submodules https://github.com/febryangrady-SSG6/caelestia.git ~/caelestia-kde
+cd ~/caelestia-kde
+bash install.sh
+bash custom/apply.sh
+```
+
+### Option B — Apply onto an existing upstream `caelestia-kde` checkout
+```bash
+# Inside an upstream checkout:
+git am /path/to/this/repo/custom/patches/*.patch
+bash /path/to/this/repo/custom/apply.sh
+```
+Or, if you only want the live config + patched QML/JS files without building from source, clone this repo and run:
+```bash
+bash ~/caelestia-kde/custom/apply.sh
+```
+
+---
+
+## Inventory of Code Patches (`custom/patches/`)
+
+1. **`0001-fix-launcher-launch-qalc-directly-without-fish-wrapp.patch`**
+   - **File:** `shell/modules/launcher/items/CalcItem.qml`
+   - **Problem:** Clicking **Open in calculator** on `>calc` ran `fish -C "exec qalc -i ..."`, which failed/closed immediately when `fish` wasn't configured cleanly.
+   - **Fix:** Launch `["...terminal", "qalc", "-i", root.math]` directly.
+
+2. **`0002-fix-lockscreen-use-mediaActionSource-in-LockScreenUi.patch`**
+   - **File:** `src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml`
+   - **Problem:** Lockscreen media controls (`previous`, `playPause`, `next`) called `root.actions` / `root.send(...)` instead of `mediaActionSource.actions` / `mediaActionSource.send(...)`, causing `TypeError` when clicking media buttons on the lockscreen.
+   - **Fix:** Reference `mediaActionSource` inside `sendAction(action)`.
+
+3. **`0003-fix-greeter-show-setup-hint-when-no-greeter-media-is.patch`**
+   - **File:** `shell/modules/bar/popouts/Greeter.qml`
+   - **Problem:** Clicking the bar greeter before any GIF/media paths were configured showed an empty black popout box.
+   - **Fix:** Show a centered placeholder (`waving_hand` + instructions) when `!root.mediaPath`.
+
+4. **`0004-feat-ai-add-Antigravity-agy-CLI-provider-to-sidebar-.patch`**
+   - **Files:**
+     - `shell/modules/sidebar/ai/antigravity.js` (new)
+     - `shell/modules/sidebar/ai/ClaudeCodeSession.qml`
+     - `shell/modules/sidebar/ai/chatsessions.js`
+     - `shell/modules/sidebar/AiAssistant.qml`
+     - `shell/modules/sidebar/Content.qml`
+   - **Summary:** Adds **Antigravity** (`/usr/bin/agy`) as a first-class CLI AI provider in the sidebar AI Assistant alongside Ollama and Claude Code:
+     - Auto-detects `agy` via `command -v agy` and discovers models asynchronously via `agy models` (handles both TTY space-padded and non-TTY tab-separated output).
+     - Caches model list, selected model, and effort level via `QtCore.Settings` (`[AntigravityAI]` in `~/.config/Caelestia/caelestia-shell.conf`) without requiring changes to compiled C++ `GlobalConfig.ai`.
+     - Streams responses (`agy -p ... --output-format stream-json`), tool cards, token counts, usage summaries, auto-titles (`--output-format json --model gemini-3.8-flash-low`), prompt suggestions, attachments (`--add-dir`), CWD selector, permission selector (excluding unsupported `--mode auto`), multi-turn resume (`--conversation <id>`), and terminal handoff (`agy --conversation <id>`).
+
+---
+
+## Inventory of System & Config Overrides (`custom/apply.sh`)
+
+| Area | What `custom/apply.sh` configures | Reason |
+| :--- | :--- | :--- |
+| **Lockscreen QML modules** | Symlinks `/usr/lib/qt6/qml/Caelestia` and `/usr/lib/qt6/qml/M3Shapes` -> `~/.local/lib/qt6/qml/...` | `kscreenlocker_greet` can miss user `QML2_IMPORT_PATH`, leading to a black screen on `Meta+L`. |
+| **KWin workspace tracker** | Installs `kwin_workspace_tracker.so` to `/usr/lib/qt6/plugins/kwin/effects/plugins/` if built | Ensures KWin loads the workspace tracker effect cleanly. |
+| **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |
+| **Terminal (`foot`)** | Installs `custom/configs/foot.ini` (`shell=bash`) | Prevents desktop **Open Terminal** / `foot` from failing on unconfigured `fish`. |
+| **Keybinds** | Installs `custom/configs/keybinds.json` + updates `kglobalshortcutsrc` | `Meta+W` / `Meta+Tab` for Caelestia Overview (unbinding KDE's conflicting `Meta+W` Overview), `Print` + `Meta+Shift+S` for Screenshot. |
+| **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
+| **Default browser** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` if installed | Uses Helium Browser as default browser. |
+
+---
+
+## Notes for Future AI Agents
+- **Antigravity CLI flags used:** `agy -p <prompt> --output-format stream-json`, `--conversation <id>`, repeatable `--add-dir <dir>`, `--mode accept-edits` / `--mode plan` / `--dangerously-skip-permissions`, `--model <id>`, `--effort <level>`. Note `--mode auto` is unavailable on standard accounts and intentionally omitted from Antigravity's permission dropdown.
+- **Prerequisites for Antigravity in sidebar:** `/usr/bin/agy` must be installed and authenticated (`agy login`) as the desktop user (`darkmattz`).
+- **Verification commands after changes:**
+  ```bash
+  /usr/lib/qt6/bin/qmllint ~/.config/quickshell/caelestia/modules/sidebar/AiAssistant.qml ~/.config/quickshell/caelestia/modules/sidebar/ai/ClaudeCodeSession.qml ~/.config/quickshell/caelestia/modules/sidebar/Content.qml
+  systemctl --user restart caelestia-shell.service
+  journalctl --user -u caelestia-shell.service -n 50 --no-pager
+  ```

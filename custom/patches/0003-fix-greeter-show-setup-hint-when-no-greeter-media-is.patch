@@ -1,0 +1,47 @@
+From c0bcd677487896407ce7564ad50724f190be4652 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:17:59 +0700
+Subject: [PATCH 3/4] fix(greeter): show setup hint when no greeter media is
+ configured
+
+---
+ shell/modules/bar/popouts/Greeter.qml | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/shell/modules/bar/popouts/Greeter.qml b/shell/modules/bar/popouts/Greeter.qml
+index d10484e6..21424d71 100644
+--- a/shell/modules/bar/popouts/Greeter.qml
++++ b/shell/modules/bar/popouts/Greeter.qml
+@@ -87,6 +87,29 @@ Item {
+         MediaItem {
+             id: two
+         }
++
++        ColumnLayout {
++            anchors.centerIn: parent
++            width: parent.width - Tokens.padding.large * 2
++            spacing: Tokens.spacing.small
++            visible: !root.mediaPath
++
++            MaterialIcon {
++                Layout.alignment: Qt.AlignHCenter
++                text: "waving_hand"
++                color: Colours.palette.m3onSurfaceVariant
++                fontStyle: Tokens.font.icon.extraLarge
++            }
++
++            StyledText {
++                Layout.fillWidth: true
++                horizontalAlignment: Text.AlignHCenter
++                wrapMode: Text.Wrap
++                text: qsTr("No greeter media set.\nRight-click greeter → Greeter settings to choose a GIF/image.")
++                color: Colours.palette.m3onSurfaceVariant
++                font.pointSize: Tokens.font.body.small.pointSize * root.fontScale
++            }
++        }
+     }
+ 
+     Item {
+-- 
+2.56.1
+

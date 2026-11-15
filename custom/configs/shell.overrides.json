@@ -1,0 +1,22 @@
+{
+    "ai": {
+        "defaultProvider": "antigravity"
+    },
+    "bar": {
+        "greeter": {
+            "afternoonGif": "root:/assets/bongocat.gif",
+            "eveningGif": "root:/assets/kurukuru.gif",
+            "mode": "timeOfDay",
+            "morningGif": "root:/assets/bongocat.gif",
+            "nightGif": "root:/assets/kurukuru.gif",
+            "showOnHover": false
+        }
+    },
+    "general": {
+        "apps": {
+            "browser": [
+                "helium-browser"
+            ]
+        }
+    }
+}

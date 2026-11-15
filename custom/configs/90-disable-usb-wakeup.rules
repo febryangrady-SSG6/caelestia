@@ -1,0 +1,9 @@
+# Prevent spurious S3 immediate wakeups on AMD AM5 (ASRock A620M-HDV/M.2+)
+# caused by the Beken 2.4G wireless mouse dongle and internal xHCI/GP17 PME.
+# Keep XHC2 (0000:12:00.0) and wired Lucky65V2 keyboard enabled for intentional key-press wake.
+
+ACTION=="add|change", SUBSYSTEM=="usb", ATTR{idVendor}=="1d57", ATTR{idProduct}=="fa60", TEST=="power/wakeup", ATTR{power/wakeup}="disabled"
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:00:08.1", TEST=="power/wakeup", ATTR{power/wakeup}="disabled"
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:11:00.3", TEST=="power/wakeup", ATTR{power/wakeup}="disabled"
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:11:00.4", TEST=="power/wakeup", ATTR{power/wakeup}="disabled"
+ACTION=="add|change", SUBSYSTEM=="pci", KERNEL=="0000:0e:00.0", TEST=="power/wakeup", ATTR{power/wakeup}="disabled"

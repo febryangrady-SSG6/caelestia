@@ -7,8 +7,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 QS_TARGET="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/caelestia"
-PLASMA_LOCKSCREEN="$HOME/.local/share/plasma/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml"
+PLASMA_LOCKSCREEN_DIR="$HOME/.local/share/plasma/shells/caelestia.desktop/contents/lockscreen"
+PLASMA_LOCKSCREEN="$PLASMA_LOCKSCREEN_DIR/LockScreenUi.qml"
 SHELL_JSON="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia/shell.json"
+SUDO=()
+[[ $EUID -ne 0 ]] && SUDO=(sudo)
 
 log()  { printf '  [CUSTOM] %s\n' "$*"; }
 warn() { printf '  [WARN]   %s\n' "$*" >&2; }
@@ -61,10 +64,12 @@ else
     warn "$QS_TARGET not found; skipping live quickshell copy"
 fi
 
-if [[ -d "$(dirname "$PLASMA_LOCKSCREEN")" ]]; then
-    log "Syncing patched LockScreenUi.qml to $PLASMA_LOCKSCREEN"
+if [[ -d "$PLASMA_LOCKSCREEN_DIR" ]]; then
+    log "Syncing patched LockScreen QML files to $PLASMA_LOCKSCREEN_DIR"
     install -Dm644 "$REPO_ROOT/src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml" \
         "$PLASMA_LOCKSCREEN"
+    install -Dm644 "$REPO_ROOT/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml" \
+        "$PLASMA_LOCKSCREEN_DIR/components/NotifDock.qml"
 fi
 
 CAELESTIA_COLOR_BIN="$HOME/.local/bin/caelestia-color"
@@ -170,7 +175,28 @@ if [[ -f /usr/share/applications/helium.desktop || -f "$HOME/.local/share/applic
     fi
 fi
 
-# 9. Reload KWin and restart caelestia-shell if running inside a user session.
+# 9. Cap systemd-logind pre-sleep delay lock wait + apply AMD AM5/ASRock wakeup fixes if present.
+if [[ -f "$SCRIPT_DIR/configs/10-sleep-delay.conf" ]]; then
+    log "Installing systemd-logind sleep delay drop-in (InhibitDelayMaxSec=2)"
+    "${SUDO[@]}" install -Dm644 "$SCRIPT_DIR/configs/10-sleep-delay.conf" \
+        /etc/systemd/logind.conf.d/10-sleep-delay.conf
+fi
+
+board_name="$(cat /sys/class/dmi/id/board_name 2>/dev/null || true)"
+if [[ "$board_name" == "A620M-HDV/M.2+" ]] || grep -qE '^GP17[[:space:]]' /proc/acpi/wakeup 2>/dev/null; then
+    log "Applying AMD AM5/ASRock USB & ACPI wakeup rules"
+    "${SUDO[@]}" install -Dm644 "$SCRIPT_DIR/configs/90-disable-usb-wakeup.rules" \
+        /etc/udev/rules.d/90-disable-usb-wakeup.rules
+    "${SUDO[@]}" udevadm control --reload-rules
+    "${SUDO[@]}" udevadm trigger --subsystem-match=usb --subsystem-match=pci || true
+
+    "${SUDO[@]}" install -Dm644 "$SCRIPT_DIR/configs/disable-acpi-wakeup.service" \
+        /etc/systemd/system/disable-acpi-wakeup.service
+    "${SUDO[@]}" systemctl daemon-reload
+    "${SUDO[@]}" systemctl enable --now disable-acpi-wakeup.service
+fi
+
+# 10. Reload KWin and restart caelestia-shell if running inside a user session.
 if command -v qdbus6 >/dev/null 2>&1; then
     qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
     qdbus6 org.kde.kglobalaccel /kglobalaccel reloadConfig >/dev/null 2>&1 || true

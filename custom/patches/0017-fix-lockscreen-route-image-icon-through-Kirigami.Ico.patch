@@ -1,0 +1,54 @@
+From 623bf071f086ce28c6f5494fe637be31f654560f Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 02:14:34 +0700
+Subject: [PATCH] fix(lockscreen): route image://icon/ through Kirigami.Icon in
+ NotifDock
+
+---
+ .../contents/lockscreen/components/NotifDock.qml | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml b/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml
+index 4987b733..a9a3e48b 100644
+--- a/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml
++++ b/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml
+@@ -32,14 +32,26 @@ Rectangle {
+         if (!img) return "";
+         var s = img.toString();
+         if (s.startsWith("image://icon/")) {
+-            s = s.substring("image://icon/".length);
++            return "";
+         }
+         if (s.startsWith("/")) {
+             return "file://" + s;
+         }
++        if (s.indexOf("://") === -1) {
++            return "";
++        }
+         return s;
+     }
+ 
++    function resolveImageIcon(img) {
++        if (!img) return "";
++        var s = img.toString();
++        if (s.startsWith("image://icon/")) {
++            return s.substring("image://icon/".length);
++        }
++        return "";
++    }
++
+     function formatNotifTime(timeStr) {
+         if (!timeStr) return qsTr("now");
+         try {
+@@ -283,7 +295,7 @@ Rectangle {
+                                 anchors.centerIn: parent
+                                 width: 22 * root.centerScale
+                                 height: 22 * root.centerScale
+-                                source: modelData.appIcon || "preferences-desktop-notification"
++                                source: root.resolveImageIcon(modelData.image) || modelData.appIcon || "preferences-desktop-notification"
+                                 fallback: "preferences-desktop-notification"
+                                 visible: !groupImg.visible
+                             }
+-- 
+2.56.1
+

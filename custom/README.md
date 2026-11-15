@@ -118,6 +118,11 @@ bash ~/caelestia-kde/custom/apply.sh
      - Replaces the duplicate `caelestiaMode` dino images with `Config.paths.sessionGif || "root:/assets/dino.gif"` (keeping monochrome `Colouriser` only for `dino.gif`).
      - Adds `SessionOptions` (`QtCore.Settings` `[Session].showHibernate`) and controls in Nexus **Session** (`SessionPage.qml`) to toggle **Show hibernate** and select **Session GIF** (`Dino`, `Kuru Kuru`, `Bongo Cat`, or custom GIF via `FileDialog`).
 
+17. **`0017-fix-lockscreen-route-image-icon-through-Kirigami.Ico.patch`**
+   - **File:** `src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml`
+   - **Problem:** `resolveImageUrl` stripped `image://icon/` from notification icons (e.g. `image://icon/system-software-update`), passing a bare icon name into QML `Image { source: ... }` which failed trying to open `file:///.../lockscreen/components/system-software-update`.
+   - **Fix:** Return `""` from `resolveImageUrl` for `image://icon/` and scheme-less non-path strings, and add `resolveImageIcon` so `Kirigami.Icon` renders the themed icon fallback cleanly.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
@@ -132,6 +137,7 @@ bash ~/caelestia-kde/custom/apply.sh
 | **Keybinds** | Installs `custom/configs/keybinds.json` + updates `kglobalshortcutsrc` | `Meta+W` / `Meta+Tab` for Caelestia Overview (unbinding KDE's conflicting `Meta+W` Overview), `Print` + `Meta+Shift+S` for Screenshot. |
 | **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, dashboard media GIF (`kurukuru.gif`), and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
 | **Default browser** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` if installed | Uses Helium Browser as default browser. |
+| **Sleep delay & AMD AM5 wakeup** | Installs `custom/configs/10-sleep-delay.conf` -> `/etc/systemd/logind.conf.d/10-sleep-delay.conf` (`InhibitDelayMaxSec=2`) and, on `A620M-HDV/M.2+` / `GP17` hosts, installs `90-disable-usb-wakeup.rules` (`1d57:fa60` dongle + `0000:00:08.1`/`11:00.3`/`11:00.4`/`0e:00.0`) and `disable-acpi-wakeup.service` (`GP17`, `XHC0`, `XHC1`, `XH00`) while keeping wired keyboard `XHC2`/`5-1` and Power Button enabled | Prevents immediate spurious S3 wakeups (`pm_wakeup_irq=36` on `GP17`/`XHC0`/`1d57:fa60`) and caps `kwin_wayland` pre-sleep delay lock hangs at 2s instead of 5s. |
 
 ---
 

@@ -92,6 +92,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Files:** `shell/modules/nexus/pages/panels/DashboardPanel.qml`, `shell/modules/nexus/PageDictionary.qml`
    - **Summary:** Adds a **Media GIF** preset selector (`Kuru Kuru`, `Bongo Cat`, `Dino`) via `SelectRow` and a **Custom media GIF** file picker (`FileDialog` for GIF/image files) via `NavRow` to Nexus Dashboard settings (`GlobalConfig.paths.mediaGif` + `GlobalConfig.save()`), indexed under `Media GIF` in `PageDictionary.qml`.
 
+12. **`0012-fix-launcher-prevent-ContentList-opacity-from-gettin.patch`**
+   - **File:** `shell/modules/launcher/ContentList.qml`
+   - **Problem:** `ContentList`'s `Behavior on state` gated `enabled` on `&& root.opacity === 1`. As soon as the state transition fade-out reduced `opacity` below `1`, `enabled` flipped to `false`, so closing the launcher or switching modes (e.g., `Alt+Tab` `windowSwitcher`, `>wallpaper `, etc.) while mid-fade aborted the `SequentialAnimation` cleanly before the `to: 1` fade-in ran—leaving `ContentList` permanently dimmed (`opacity < 1`) until Quickshell restarted.
+   - **Fix:** Removed `root.opacity === 1` from `Behavior on state`'s `enabled` condition, dropped the hardcoded `from: 1` on fade-out, and guaranteed `root.opacity = 1` whenever `stateTransitionAnim` stops (`onRunningChanged`), `state` changes with the behavior disabled (`onStateChanged`), or the launcher opens (`onLauncherChanged`).
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

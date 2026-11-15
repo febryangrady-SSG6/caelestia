@@ -42,6 +42,8 @@ Item {
     property bool showReboot: false
     property bool showShutdown: false
     property bool blurWallpaper: false
+    property bool standardGrey: true
+    property var _pendingSchemeData: null
 
     readonly property bool hasFingerprint: enableFprint && (fprintTries < maxFprintTries) && Boolean(authenticator.authenticatorTypes & ScreenLocker.Authenticator.Fingerprint)
     readonly property bool fprintDisabledDueToTries: enableFprint && (fprintTries >= maxFprintTries) && Boolean(authenticator.authenticatorTypes & ScreenLocker.Authenticator.Fingerprint)
@@ -52,23 +54,23 @@ Item {
     readonly property color clCardBg: alterColour(clSurfaceContainer, 0.60, 1)
     readonly property color clCardBgHigh: alterColour(clSurfaceContainerHigh, 0.60, 1)
 
-    property color clSurface: "#0a0f0f"
-    property color clSurfaceFg: "#dce8e6"
-    property color clSurfaceContainer: "#131b1a"
-    property color clSurfaceContainerHigh: "#192120"
-    property color clSurfaceContainerHighest: "#1d2827"
-    property color clPrimary: "#9bd0cc"
-    property color clSecondary: "#b0ccc9"
-    property color clPrimaryFg: "#0d4845"
-    property color clError: "#fa746f"
-    property color clSurfaceVariantFg: "#a2adac"
-    property color clPrimaryContainer: "#255b58"
-    property color clSecondaryContainer: "#27403e"
-    property color clTertiary: "#d5efff"
-    property color clOnTertiary: "#2e5c72"
-    property color clOutline: "#6d7876"
+    property color clSurface: "#131313"
+    property color clSurfaceFg: "#e4e4e4"
+    property color clSurfaceContainer: "#1c1c1c"
+    property color clSurfaceContainerHigh: "#252525"
+    property color clSurfaceContainerHighest: "#303030"
+    property color clPrimary: "#c8c8c8"
+    property color clSecondary: "#b0b0b0"
+    property color clPrimaryFg: "#1a1a1a"
+    property color clError: "#ffb4ab"
+    property color clSurfaceVariantFg: "#a0a0a0"
+    property color clPrimaryContainer: "#383838"
+    property color clSecondaryContainer: "#2c2c2c"
+    property color clTertiary: "#d6d6d6"
+    property color clOnTertiary: "#242424"
+    property color clOutline: "#707070"
 
-    property var clTerms: []
+    property var clTerms: ["#202020", "#3a3a3a", "#545454", "#6e6e6e", "#888888", "#a4a4a4", "#c2c2c2", "#e0e0e0"]
 
     readonly property bool isAuthenticating: authHandler.isAuthenticating
     readonly property var activePasswordPill: isPortrait ? portraitPasswordPill : passwordPill
@@ -143,6 +145,32 @@ Item {
         onTriggered: lockScreenUi.ready = true
     }
 
+    function applySchemeData(d) {
+        if (!d) return;
+        var c = d.colours || d;
+        if (c.surface) clSurface = "#" + c.surface;
+        if (c.onSurface) clSurfaceFg = "#" + c.onSurface;
+        if (c.surfaceContainer) clSurfaceContainer = "#" + c.surfaceContainer;
+        if (c.surfaceContainerHigh) clSurfaceContainerHigh = "#" + c.surfaceContainerHigh;
+        if (c.surfaceContainerHighest) clSurfaceContainerHighest = "#" + c.surfaceContainerHighest;
+        if (c.primary) clPrimary = "#" + c.primary;
+        if (c.secondary) clSecondary = "#" + c.secondary;
+        if (c.onPrimary) clPrimaryFg = "#" + c.onPrimary;
+        if (c.error) clError = "#" + c.error;
+        if (c.onSurfaceVariant) clSurfaceVariantFg = "#" + c.onSurfaceVariant;
+        if (c.primaryContainer) clPrimaryContainer = "#" + c.primaryContainer;
+        if (c.secondaryContainer) clSecondaryContainer = "#" + c.secondaryContainer;
+        if (c.tertiary) clTertiary = "#" + c.tertiary;
+        if (c.onTertiary) clOnTertiary = "#" + c.onTertiary;
+        if (c.outline) clOutline = "#" + c.outline;
+        var terms = [];
+        for (var i = 0; i < 8; i++) {
+            if (c["term" + i]) terms.push("#" + c["term" + i]);
+        }
+        if (terms.length > 0) lockScreenUi.clTerms = terms;
+        lockScreenUi.greetingInfo = lockScreenUi.getGreeting();
+    }
+
     Plasma5Support.DataSource {
         id: schemeLoader
 
@@ -154,28 +182,9 @@ Item {
             if (!stdout) return;
             try {
                 var d = JSON.parse(stdout);
-                var c = d.colours || d;
-                if (c.surface) clSurface = "#" + c.surface;
-                if (c.onSurface) clSurfaceFg = "#" + c.onSurface;
-                if (c.surfaceContainer) clSurfaceContainer = "#" + c.surfaceContainer;
-                if (c.surfaceContainerHigh) clSurfaceContainerHigh = "#" + c.surfaceContainerHigh;
-                if (c.surfaceContainerHighest) clSurfaceContainerHighest = "#" + c.surfaceContainerHighest;
-                if (c.primary) clPrimary = "#" + c.primary;
-                if (c.secondary) clSecondary = "#" + c.secondary;
-                if (c.onPrimary) clPrimaryFg = "#" + c.onPrimary;
-                if (c.error) clError = "#" + c.error;
-                if (c.onSurfaceVariant) clSurfaceVariantFg = "#" + c.onSurfaceVariant;
-                if (c.primaryContainer) clPrimaryContainer = "#" + c.primaryContainer;
-                if (c.secondaryContainer) clSecondaryContainer = "#" + c.secondaryContainer;
-                if (c.tertiary) clTertiary = "#" + c.tertiary;
-                if (c.onTertiary) clOnTertiary = "#" + c.onTertiary;
-                if (c.outline) clOutline = "#" + c.outline;
-                var terms = [];
-                for (var i = 0; i < 8; i++) {
-                    if (c["term" + i]) terms.push("#" + c["term" + i]);
-                }
-                if (terms.length > 0) lockScreenUi.clTerms = terms;
-                lockScreenUi.greetingInfo = lockScreenUi.getGreeting();
+                lockScreenUi._pendingSchemeData = d;
+                if (!lockScreenUi.standardGrey)
+                    lockScreenUi.applySchemeData(d);
             } catch(e) {}
         }
     }
@@ -217,6 +226,11 @@ Item {
                     lockScreenUi.rotateProfilePic = lk.rotateProfilePic;
                 if (typeof lk.blurWallpaper === "boolean")
                     lockScreenUi.blurWallpaper = lk.blurWallpaper;
+                if (typeof lk.standardGrey === "boolean") {
+                    lockScreenUi.standardGrey = lk.standardGrey;
+                    if (!lk.standardGrey && lockScreenUi._pendingSchemeData)
+                        lockScreenUi.applySchemeData(lockScreenUi._pendingSchemeData);
+                }
                 if (cfg.session && cfg.session.icons)
                     lockScreenUi.sessionIcons = cfg.session.icons;
                 if (typeof lk.showSleep === "boolean")

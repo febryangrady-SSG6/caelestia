@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
 import qs.components.controls
+import qs.services
 
 /// The card a utilities-drawer modal shows when it asks before doing something:
 /// a title, what confirming affects, and Cancel / confirm buttons. Cancelling and

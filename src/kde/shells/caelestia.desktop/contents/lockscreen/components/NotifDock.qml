@@ -32,12 +32,24 @@ Rectangle {
         if (!img) return "";
         var s = img.toString();
         if (s.startsWith("image://icon/")) {
-            s = s.substring("image://icon/".length);
+            return "";
         }
         if (s.startsWith("/")) {
             return "file://" + s;
         }
+        if (s.indexOf("://") === -1) {
+            return "";
+        }
         return s;
+    }
+
+    function resolveImageIcon(img) {
+        if (!img) return "";
+        var s = img.toString();
+        if (s.startsWith("image://icon/")) {
+            return s.substring("image://icon/".length);
+        }
+        return "";
     }
 
     function formatNotifTime(timeStr) {
@@ -283,7 +295,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 width: 22 * root.centerScale
                                 height: 22 * root.centerScale
-                                source: modelData.appIcon || "preferences-desktop-notification"
+                                source: root.resolveImageIcon(modelData.image) || modelData.appIcon || "preferences-desktop-notification"
                                 fallback: "preferences-desktop-notification"
                                 visible: !groupImg.visible
                             }

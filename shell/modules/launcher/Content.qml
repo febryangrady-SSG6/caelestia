@@ -9,6 +9,7 @@ import Caelestia.Config
 import Caelestia.Services
 import qs.components
 import qs.components.controls
+import qs.components.effects
 import qs.services
 import qs.modules.launcher.services
 
@@ -590,6 +591,40 @@ Item {
         y: Math.round((root.height - height) / 2)
         padding: root.padding
 
+        enter: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: root.Tokens.anim.durations.expressiveDefaultEffects
+                easing: root.Tokens.anim.expressiveDefaultEffects
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 0.88
+                to: 1
+                duration: root.Tokens.anim.durations.expressiveFastSpatial
+                easing: root.Tokens.anim.expressiveFastSpatial
+            }
+        }
+
+        exit: Transition {
+            NumberAnimation {
+                property: "opacity"
+                from: 1
+                to: 0
+                duration: root.Tokens.anim.durations.expressiveFastEffects
+                easing: root.Tokens.anim.expressiveFastEffects
+            }
+            NumberAnimation {
+                property: "scale"
+                from: 1
+                to: 0.92
+                duration: root.Tokens.anim.durations.expressiveFastEffects
+                easing: root.Tokens.anim.expressiveFastEffects
+            }
+        }
+
         onClosed: {
             if (root.visibilities.launcher)
                 search.forceActiveFocus();
@@ -637,11 +672,22 @@ Item {
             }
         }
 
-        background: StyledRect {
-            radius: root.Tokens.rounding.large
-            color: Colours.palette.m3surfaceContainerHigh
-            border.width: 1
-            border.color: Colours.palette.m3outlineVariant
+        background: Item {
+            Elevation {
+                anchors.fill: sessionBgRect
+                level: 3
+                radius: sessionBgRect.radius
+            }
+
+            StyledRect {
+                id: sessionBgRect
+
+                anchors.fill: parent
+                radius: root.Tokens.rounding.large
+                color: Colours.palette.m3surfaceContainerHigh
+                border.width: 1
+                border.color: Colours.palette.m3outlineVariant
+            }
         }
     }
 }

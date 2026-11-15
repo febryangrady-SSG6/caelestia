@@ -170,7 +170,7 @@ QtObject {
             description: qsTr("Session, services, storage, about"),
             category: "system",
             settings: [
-                { label: qsTr("Session settings"), keywords: ["power", "shutdown", "logout", "reboot", "hibernate"], pagePath: "SessionPage.qml", subPageIdx: 0 },
+                { label: qsTr("Session settings"), keywords: ["power", "shutdown", "logout", "reboot", "sleep", "hibernate", "session gif", "dino", "kurukuru", "bongocat"], pagePath: "SessionPage.qml", subPageIdx: 0 },
                 { label: qsTr("System Services"), keywords: ["daemons", "systemd", "tuning", "visualiser", "microphone", "cava"], pagePath: "ServicesPage.qml", subPageIdx: 1 },
                 { label: qsTr("Remote IPC"), keywords: ["discord", "steamgriddb", "activity", "arpc", "rpc"], pagePath: "services/ArpcPage.qml", subPageIdx: 2 },
                 { label: qsTr("Calendar Integration"), keywords: ["agenda", "events", "ics", "ical", "google", "nextcloud", "reminder"], pagePath: "services/CalendarPage.qml", subPageIdx: 3 },

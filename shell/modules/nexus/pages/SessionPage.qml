@@ -5,11 +5,30 @@ import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
 import qs.components.controls
+import qs.components.filedialog
 import qs.services
 import qs.modules.nexus.common
 
 PageBase {
     id: root
+
+    readonly property list<MenuItem> sessionGifItems: [
+        MenuItem {
+            icon: "cruelty_free"
+            text: qsTr("Dino")
+            value: "root:/assets/dino.gif"
+        },
+        MenuItem {
+            icon: "animation"
+            text: qsTr("Kuru Kuru")
+            value: "root:/assets/kurukuru.gif"
+        },
+        MenuItem {
+            icon: "pets"
+            text: qsTr("Bongo Cat")
+            value: "root:/assets/bongocat.gif"
+        }
+    ]
 
     function commandString(list: var): string {
         return (list || []).join(" ");
@@ -52,7 +71,6 @@ PageBase {
         }
 
         StepperRow {
-            last: true
             label: qsTr("Drag threshold")
             subtext: qsTr("Pixels to drag before the menu moves")
             reset: ({ node: GlobalConfig.session, setting: "dragThreshold" })
@@ -61,6 +79,58 @@ PageBase {
             to: 200
             stepSize: 5
             onMoved: v => GlobalConfig.session.dragThreshold = v
+        }
+
+        ToggleRow {
+            Layout.fillWidth: true
+            text: qsTr("Show hibernate")
+            subtext: qsTr("Display the Hibernate button in the session menu (turn off to disable)")
+            reset: ({
+                customGet: () => SessionOptions.showHibernate,
+                customDef: true,
+                customSet: v => SessionOptions.showHibernate = v
+            })
+            checked: SessionOptions.showHibernate
+            onToggled: SessionOptions.showHibernate = checked
+        }
+
+        SelectRow {
+            id: sessionGifSelect
+
+            Layout.fillWidth: true
+            label: qsTr("Session GIF")
+            subtext: qsTr("Animated GIF shown in the session menu (%1)").arg((Config.paths.sessionGif || "root:/assets/dino.gif").split("/").pop())
+            active: root.sessionGifItems.find(item => item.value === Config.paths.sessionGif) ?? null
+            fallbackText: qsTr("Custom")
+            fallbackIcon: "image"
+            menuItems: root.sessionGifItems
+            onSelected: item => {
+                GlobalConfig.paths.sessionGif = item.value;
+                GlobalConfig.save();
+                active = Qt.binding(() => root.sessionGifItems.find(i => i.value === Config.paths.sessionGif) ?? null);
+            }
+        }
+
+        NavRow {
+            last: true
+            Layout.fillWidth: true
+            icon: "folder_open"
+            label: qsTr("Custom session GIF")
+            status: Config.paths.sessionGif ? Config.paths.sessionGif.split("/").pop() : qsTr("Default (dino.gif)")
+            onClicked: sessionGifDialog.open()
+
+            FileDialog {
+                id: sessionGifDialog
+
+                title: qsTr("Select Session GIF")
+                filterLabel: qsTr("Images and GIFs (*.gif, *.webp, *.png, *.apng, *.jpg)")
+                filters: ["gif", "webp", "png", "apng", "jpg", "jpeg"]
+                onAccepted: path => {
+                    GlobalConfig.paths.sessionGif = path;
+                    GlobalConfig.save();
+                    sessionGifSelect.active = Qt.binding(() => root.sessionGifItems.find(i => i.value === Config.paths.sessionGif) ?? null);
+                }
+            }
         }
 
         SectionHeader {

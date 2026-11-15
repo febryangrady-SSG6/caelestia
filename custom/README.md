@@ -58,12 +58,18 @@ bash ~/caelestia-kde/custom/apply.sh
      - Caches model list, selected model, and effort level via `QtCore.Settings` (`[AntigravityAI]` in `~/.config/Caelestia/caelestia-shell.conf`) without requiring changes to compiled C++ `GlobalConfig.ai`.
      - Streams responses (`agy -p ... --output-format stream-json`), tool cards, token counts, usage summaries, auto-titles (`--output-format json --model gemini-3.8-flash-low`), prompt suggestions, attachments (`--add-dir`), CWD selector, permission selector (excluding unsupported `--mode auto`), multi-turn resume (`--conversation <id>`), and terminal handoff (`agy --conversation <id>`).
 
+5. **`0005-fix-colors-repair-KDE-Selection-and-Complementary-co.patch`**
+   - **File:** `src/bin/caelestia-color`
+   - **Problem:** The vendored `Matugen.colors` KDE color template maps `[Colors:Selection]` `ForegroundNormal` / `ForegroundLink` to `secondary_fixed` and `ForegroundInactive` to `on_surface_variant` on `BackgroundNormal = primary` (1.31:1 contrast in `gruvbox/soft/dark`), and maps `[Colors:Complementary]` `ForegroundNormal` to `on_primary_container` on `surface` (1.09:1 contrast). Existing `cmd_kde_selection` returned early whenever `name != "dynamic"`, leaving named schemes unpatched.
+   - **Fix:** Added `contrast_ratio()` and updated `cmd_kde_selection` in `src/bin/caelestia-color` to run for **all** schemes (dynamic and named), setting `[Colors:Selection]` `ForegroundNormal` to `#000000`/`#ffffff` against `primary`, repairing `ForegroundLink` and `ForegroundInactive` (`#262626`/`#d9d9d9`) when contrast `< 4.5:1`, and repairing `[Colors:Complementary]` `ForegroundNormal` (`onSurface` when `>= 4.5:1`, otherwise `#000000`/`#ffffff`) when contrast `< 4.5:1`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
 
 | Area | What `custom/apply.sh` configures | Reason |
 | :--- | :--- | :--- |
+| **KDE color contrast** | Syncs patched `src/bin/caelestia-color` to `~/.local/bin/caelestia-color` and re-applies active named scheme | Ensures `[Colors:Selection]` and `[Colors:Complementary]` contrast fixes apply to named schemes (e.g. `gruvbox/soft/dark`). |
 | **Lockscreen QML modules** | Symlinks `/usr/lib/qt6/qml/Caelestia` and `/usr/lib/qt6/qml/M3Shapes` -> `~/.local/lib/qt6/qml/...` | `kscreenlocker_greet` can miss user `QML2_IMPORT_PATH`, leading to a black screen on `Meta+L`. |
 | **KWin workspace tracker** | Installs `kwin_workspace_tracker.so` to `/usr/lib/qt6/plugins/kwin/effects/plugins/` if built | Ensures KWin loads the workspace tracker effect cleanly. |
 | **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |

@@ -41,6 +41,24 @@ if [[ -d "$(dirname "$PLASMA_LOCKSCREEN")" ]]; then
         "$PLASMA_LOCKSCREEN"
 fi
 
+CAELESTIA_COLOR_BIN="$HOME/.local/bin/caelestia-color"
+if [[ -f "$REPO_ROOT/src/bin/caelestia-color" ]]; then
+    log "Syncing patched caelestia-color to $CAELESTIA_COLOR_BIN"
+    install -Dm755 "$REPO_ROOT/src/bin/caelestia-color" "$CAELESTIA_COLOR_BIN"
+    if [[ -f "${XDG_STATE_HOME:-$HOME/.local/state}/caelestia/scheme.json" ]]; then
+        scheme_name="$("$CAELESTIA_COLOR_BIN" scheme get -n 2>/dev/null || true)"
+        scheme_flavour="$("$CAELESTIA_COLOR_BIN" scheme get -f 2>/dev/null || true)"
+        scheme_mode="$("$CAELESTIA_COLOR_BIN" scheme get -m 2>/dev/null || true)"
+        if [[ -n "$scheme_name" && "$scheme_name" != "dynamic" ]]; then
+            scheme_args=(-n "$scheme_name")
+            [[ -n "$scheme_flavour" ]] && scheme_args+=(-f "$scheme_flavour")
+            [[ -n "$scheme_mode" ]] && scheme_args+=(-m "$scheme_mode")
+            log "Re-applying active KDE colour scheme ($scheme_name) with contrast fix"
+            "$CAELESTIA_COLOR_BIN" scheme set "${scheme_args[@]}" >/dev/null 2>&1 || true
+        fi
+    fi
+fi
+
 # 2. Ensure kscreenlocker_greet (which ignores user QML2_IMPORT_PATH on some systems)
 #    can resolve Caelestia and M3Shapes QML modules under /usr/lib/qt6/qml.
 for mod in Caelestia M3Shapes; do

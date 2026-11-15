@@ -7,12 +7,31 @@ import M3Shapes
 import Caelestia.Config
 import qs.components
 import qs.components.controls
+import qs.components.filedialog
 import qs.services
 import qs.utils
 import qs.modules.nexus.common
 
 PageBase {
     id: root
+
+    readonly property list<MenuItem> mediaGifItems: [
+        MenuItem {
+            icon: "animation"
+            text: qsTr("Kuru Kuru")
+            value: "root:/assets/kurukuru.gif"
+        },
+        MenuItem {
+            icon: "pets"
+            text: qsTr("Bongo Cat")
+            value: "root:/assets/bongocat.gif"
+        },
+        MenuItem {
+            icon: "cruelty_free"
+            text: qsTr("Dino")
+            value: "root:/assets/dino.gif"
+        }
+    ]
 
     readonly property list<MenuItem> dashboardShapeItems: [
         MenuItem {
@@ -183,6 +202,44 @@ PageBase {
             reset: ({ node: GlobalConfig.dashboard, setting: "showTerminal" })
             checked: Config.dashboard.showTerminal
             onToggled: GlobalConfig.dashboard.showTerminal = checked
+        }
+
+        SelectRow {
+            id: mediaGifSelect
+
+            Layout.fillWidth: true
+            label: qsTr("Media GIF")
+            subtext: qsTr("Animated GIF shown on the dashboard media card (%1)").arg(Config.paths.mediaGif.split("/").pop() || qsTr("Default"))
+            active: root.mediaGifItems.find(item => item.value === Config.paths.mediaGif) ?? null
+            fallbackText: qsTr("Custom")
+            fallbackIcon: "image"
+            menuItems: root.mediaGifItems
+            onSelected: item => {
+                GlobalConfig.paths.mediaGif = item.value;
+                GlobalConfig.save();
+                active = Qt.binding(() => root.mediaGifItems.find(i => i.value === Config.paths.mediaGif) ?? null);
+            }
+        }
+
+        NavRow {
+            Layout.fillWidth: true
+            icon: "folder_open"
+            label: qsTr("Custom media GIF")
+            status: Config.paths.mediaGif ? Config.paths.mediaGif.split("/").pop() : qsTr("Not set")
+            onClicked: mediaGifDialog.open()
+
+            FileDialog {
+                id: mediaGifDialog
+
+                title: qsTr("Select Dashboard Media GIF")
+                filterLabel: qsTr("Images and GIFs (*.gif, *.webp, *.png, *.apng, *.jpg)")
+                filters: ["gif", "webp", "png", "apng", "jpg", "jpeg"]
+                onAccepted: path => {
+                    GlobalConfig.paths.mediaGif = path;
+                    GlobalConfig.save();
+                    mediaGifSelect.active = Qt.binding(() => root.mediaGifItems.find(i => i.value === Config.paths.mediaGif) ?? null);
+                }
+            }
         }
 
         ToggleRow {

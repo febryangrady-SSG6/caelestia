@@ -27,7 +27,7 @@ Item {
 
     property bool isDragging: false
 
-    property real spacing: Tokens.spacing.medium
+    property real spacing: Tokens.spacing.small
 
     property real padding: Tokens.padding.medium
 
@@ -39,7 +39,7 @@ Item {
     readonly property real configuredItemSize: Math.max(16, Math.min(effectiveThickness, Config.bar.dock.iconSize || 32))
     // Icon size of a dock item. Derived from the configured item size rather than the
     // delegate's laid-out width, which is still 0 while the delegate is being created.
-    readonly property real iconSize: Math.round(configuredItemSize * 0.7 / 2) * 2
+    readonly property real iconSize: Math.max(16, Math.min(configuredItemSize - 4, Math.round(configuredItemSize * 0.88 / 2) * 2))
 
     implicitWidth: bar.isHorizontal ? container.width : container.implicitWidth
     implicitHeight: bar.isHorizontal ? container.implicitHeight : container.height
@@ -652,6 +652,7 @@ Item {
                         id: icon
 
                         anchors.centerIn: parent
+                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
                         implicitSize: root.iconSize
                         source: modelData ? WinIcons.sourceFor(modelData.entry, modelData.appClass, modelData.iconName, modelData.pid ?? 0) : ""
                         visible: !(Config.bar.dock.recolourIcons ?? false)
@@ -666,6 +667,7 @@ Item {
 
                     ColouredIcon {
                         anchors.centerIn: parent
+                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
                         implicitSize: root.iconSize
                         source: icon.source
                         colour: Colours.palette.m3secondary

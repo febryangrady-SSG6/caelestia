@@ -27,6 +27,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/ContentList.qml" \
         "$QS_TARGET/modules/launcher/ContentList.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/launcher/Content.qml" \
+        "$QS_TARGET/modules/launcher/Content.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/AppTile.qml" \
         "$QS_TARGET/modules/launcher/items/AppTile.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \

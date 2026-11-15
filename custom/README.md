@@ -102,6 +102,10 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `DrawerConfirmModal.qml` referenced `Colours.palette.m3onSurfaceVariant` for the confirmation dialog body text without importing `qs.services`, causing `Colours` to fail lookup and fall back to `#000000` black text on dark surfaces (e.g. `Delete recording?`).
    - **Fix:** Added `import qs.services`.
 
+14. **`0014-feat-launcher-confirm-Log-Out-Restart-and-Shut-Down-.patch`**
+   - **File:** `shell/modules/launcher/Content.qml`
+   - **Summary:** Adds a modal confirmation dialog (`sessionConfirmPopup` via `requestSessionConfirmation`) when clicking **Log Out**, **Restart**, or **Shut Down** in the Launcher power menu footer (leaving **Sleep** immediate), with destructive error styling for **Shut Down** and automatic dismissal when the launcher closes.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

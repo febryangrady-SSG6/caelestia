@@ -127,14 +127,36 @@ Item {
         }
     }
 
+    onStateChanged: {
+        if (!stateBehavior.enabled && !stateTransitionAnim.running)
+            root.opacity = 1;
+    }
+
+    Connections {
+        function onLauncherChanged(): void {
+            if (root.visibilities.launcher && !stateTransitionAnim.running)
+                root.opacity = 1;
+        }
+
+        target: root.visibilities
+    }
+
     Behavior on state {
-        enabled: root.visibilities.launcher && !root.visibilities.skipLauncherAnim && root.opacity === 1
+        id: stateBehavior
+
+        enabled: root.visibilities.launcher && !root.visibilities.skipLauncherAnim
 
         SequentialAnimation {
+            id: stateTransitionAnim
+
+            onRunningChanged: {
+                if (!running)
+                    root.opacity = 1;
+            }
+
             Anim {
                 target: root
                 property: "opacity"
-                from: 1
                 to: 0
                 type: Anim.DefaultEffects
             }

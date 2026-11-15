@@ -280,8 +280,8 @@ Item {
         readonly property var actions: ["previous", "playPause", "next"]
 
         function sendAction(action) {
-            if (root.actions.includes(action))
-                root.send("mpris " + action);
+            if (mediaActionSource.actions.includes(action))
+                mediaActionSource.send("mpris " + action);
         }
 
         onReplied: mprisSource.send("mpris status")

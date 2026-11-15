@@ -17,6 +17,8 @@ warn() { printf '  [WARN]   %s\n' "$*" >&2; }
 #    Works even if the user installed from upstream first and cloned this later.
 if [[ -d "$QS_TARGET" ]]; then
     log "Syncing patched shell QML/JS files to $QS_TARGET"
+    install -Dm644 "$REPO_ROOT/shell/components/controls/Menu.qml" \
+        "$QS_TARGET/components/controls/Menu.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \

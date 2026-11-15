@@ -63,6 +63,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** The vendored `Matugen.colors` KDE color template maps `[Colors:Selection]` `ForegroundNormal` / `ForegroundLink` to `secondary_fixed` and `ForegroundInactive` to `on_surface_variant` on `BackgroundNormal = primary` (1.31:1 contrast in `gruvbox/soft/dark`), and maps `[Colors:Complementary]` `ForegroundNormal` to `on_primary_container` on `surface` (1.09:1 contrast). Existing `cmd_kde_selection` returned early whenever `name != "dynamic"`, leaving named schemes unpatched.
    - **Fix:** Added `contrast_ratio()` and updated `cmd_kde_selection` in `src/bin/caelestia-color` to run for **all** schemes (dynamic and named), setting `[Colors:Selection]` `ForegroundNormal` to `#000000`/`#ffffff` against `primary`, repairing `ForegroundLink` and `ForegroundInactive` (`#262626`/`#d9d9d9`) when contrast `< 4.5:1`, and repairing `[Colors:Complementary]` `ForegroundNormal` (`onSurface` when `>= 4.5:1`, otherwise `#000000`/`#ffffff`) when contrast `< 4.5:1`.
 
+6. **`0006-fix-menu-avoid-QtQuick.Controls.Menu-shadowing-and-c.patch`**
+   - **File:** `shell/components/controls/Menu.qml`
+   - **Problem:** `Menu.qml` had an unqualified `import QtQuick.Controls`, so `QtQuick.Controls.Menu` (`Right=5`, `Top=1`, `Bottom=7`) shadowed `Menu.qml`'s own `enum Side` (`Top=0, Bottom=1, Left=2, Right=3`) in the root `attachSideX`/`thisSideX` defaults (`5`), while child expressions/callers (`SplitButton.qml`) used `Side.Right` (`3`). Because `5 !== 3`, `thisSideX === Menu.Right` evaluated `false`, skipping `off -= width` and opening `SplitButton` dropdown menus (like Utilities Screen Capture) off the right edge of the button/screen.
+   - **Fix:** Aliased `import QtQuick.Controls as Controls` (`Controls.ScrollBar.vertical`) so `Menu` enum values resolve consistently, used `menu.width` / `menu.height` explicitly, and clamped `menu.x` within `[0, root.parent.width - menu.implicitWidth]`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

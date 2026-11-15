@@ -1,0 +1,74 @@
+From a1d143625681da1c105803b85c71ce67d090b6d5 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 02:48:40 +0700
+Subject: [PATCH] fix(launch): pass -e when executing commands in konsole
+
+---
+ shell/modules/launcher/items/CalcItem.qml |  3 ++-
+ shell/modules/nexus/pages/UpdatesPage.qml |  2 +-
+ shell/utils/Launch.qml                    | 14 +++++++++++++-
+ 3 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/shell/modules/launcher/items/CalcItem.qml b/shell/modules/launcher/items/CalcItem.qml
+index dcc377f8..f454af34 100644
+--- a/shell/modules/launcher/items/CalcItem.qml
++++ b/shell/modules/launcher/items/CalcItem.qml
+@@ -5,6 +5,7 @@ import Caelestia
+ import Caelestia.Config
+ import qs.components
+ import qs.services
++import qs.utils
+ 
+ Item {
+     id: root
+@@ -78,7 +79,7 @@ Item {
+                 id: stateLayer
+ 
+                 onClicked: {
+-                    Quickshell.execDetached([...GlobalConfig.general.apps.terminal, "qalc", "-i", root.math]);
++                    Quickshell.execDetached([...Launch.terminalExecPrefix([]), "qalc", "-i", root.math]);
+                     root.list.visibilities.launcher = false;
+                 }
+ 
+diff --git a/shell/modules/nexus/pages/UpdatesPage.qml b/shell/modules/nexus/pages/UpdatesPage.qml
+index fc2abed3..99e0ecc1 100644
+--- a/shell/modules/nexus/pages/UpdatesPage.qml
++++ b/shell/modules/nexus/pages/UpdatesPage.qml
+@@ -135,7 +135,7 @@ PageBase {
+         root.selectedVersionId = "";
+         // Holds the terminal open afterwards: the update restarts the shell and its output is what the user needs to read.
+         const hold = 'caelestia-update "$@"; s=$?; printf "\\n[caelestia-update exited with status %s] Press Enter to close..." "$s"; read -r _';
+-        Launch.exec([...root.terminalCommand, "sh", "-c", hold, "sh", ...command]);
++        Launch.exec([...Launch.terminalExecPrefix(root.terminalCommand), "sh", "-c", hold, "sh", ...command]);
+     }
+ 
+     title: qsTr("Updates")
+diff --git a/shell/utils/Launch.qml b/shell/utils/Launch.qml
+index 1f047707..da70a1b5 100644
+--- a/shell/utils/Launch.qml
++++ b/shell/utils/Launch.qml
+@@ -49,8 +49,20 @@ Singleton {
+         root.exec(["systemsettings", name]);
+     }
+ 
++    function terminalExecPrefix(baseTerminal: list<string>): list<string> {
++        const term = baseTerminal && baseTerminal.length > 0 ? baseTerminal : GlobalConfig.general.apps.terminal;
++        if (!term || term.length === 0)
++            return [];
++        const arr = Array.from(term);
++        const bin = String(arr[0] || "").split("/").pop();
++        // Konsole requires -e before an inline command rather than bare positional args.
++        if (bin === "konsole" && arr.indexOf("-e") === -1)
++            return [...arr, "-e"];
++        return arr;
++    }
++
+     function terminalCommand(command: list<string>): list<string> {
+-        return [...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...command];
++        return [...root.terminalExecPrefix([]), `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...command];
+     }
+ 
+     function launchInTerminal(command: list<string>, workingDirectory: string): void {
+-- 
+2.56.1
+

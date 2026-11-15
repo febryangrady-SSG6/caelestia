@@ -127,6 +127,10 @@ bash ~/caelestia-kde/custom/apply.sh
    - **File:** `src/kde/shells/caelestia.desktop/contents/lockscreen/LockScreenUi.qml`
    - **Summary:** Adds `standardGrey` (default `true`) and `applySchemeData` helper, keeping the active lockscreen wallpaper intact while switching the lockscreen palette defaults (`clSurface`, `clSurfaceFg`, `clSurfaceContainer`, `clPrimary`, `clTerms`, etc.) to standard neutral grey unless `lock.standardGrey` is explicitly set to `false` in `shell.json`.
 
+19. **`0019-fix-launch-pass-e-when-executing-commands-in-konsole.patch`**
+   - **Files:** `shell/utils/Launch.qml`, `shell/modules/launcher/items/CalcItem.qml`, `shell/modules/nexus/pages/UpdatesPage.qml`
+   - **Summary:** Adds `Launch.terminalExecPrefix(baseTerminal)` and routes `terminalCommand`, `CalcItem` (`qalc`), and `UpdatesPage` through it so Konsole receives `-e` before inline commands while bare terminal launches (`Meta+Return`, desktop context menu) run `["konsole"]` cleanly.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
@@ -139,8 +143,8 @@ bash ~/caelestia-kde/custom/apply.sh
 | **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |
 | **Terminal (`foot`)** | Installs `custom/configs/foot.ini` (`shell=bash`) | Prevents desktop **Open Terminal** / `foot` from failing on unconfigured `fish`. |
 | **Keybinds** | Installs `custom/configs/keybinds.json` + updates `kglobalshortcutsrc` | `Meta+W` / `Meta+Tab` for Caelestia Overview (unbinding KDE's conflicting `Meta+W` Overview), `Print` + `Meta+Shift+S` for Screenshot. |
-| **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, dashboard media GIF (`kurukuru.gif`), and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
-| **Default browser** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` if installed | Uses Helium Browser as default browser. |
+| **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, default terminal `konsole`, `launcher.hiddenApps` (`foot`, `footclient`, `foot-server`), dashboard media GIF (`kurukuru.gif`), and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
+| **Default browser & terminal** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` and `TerminalApplication=konsole` / `TerminalService=org.kde.konsole.desktop` in `kdeglobals` | Uses Helium Browser as default browser and Konsole as default KDE terminal. |
 | **Sleep delay & AMD AM5 wakeup** | Installs `custom/configs/10-sleep-delay.conf` -> `/etc/systemd/logind.conf.d/10-sleep-delay.conf` (`InhibitDelayMaxSec=2`) and, on `A620M-HDV/M.2+` / `GP17` hosts, installs `90-disable-usb-wakeup.rules` (`1d57:fa60` dongle + `0000:00:08.1`/`11:00.3`/`11:00.4`/`0e:00.0`) and `disable-acpi-wakeup.service` (`GP17`, `XHC0`, `XHC1`, `XH00`) while keeping wired keyboard `XHC2`/`5-1` and Power Button enabled | Prevents immediate spurious S3 wakeups (`pm_wakeup_irq=36` on `GP17`/`XHC0`/`1d57:fa60`) and caps `kwin_wayland` pre-sleep delay lock hangs at 2s instead of 5s. |
 | **SDDM login theme** | Installs `custom/sddm-theme/` -> `/usr/share/sddm/themes/caelestia-lockscreen/`, copies current wallpaper & avatar, writes `/etc/sddm.conf.d/zz-caelestia.conf` (`Current=caelestia-lockscreen`, `GreeterEnvironment=QML_XHR_ALLOW_FILE_READ=1`), and enables `sddm.service` | Matches the SDDM login screen visually to the standard-grey Caelestia lockscreen (`caelestia.desktop`) with the same layout, blur card, clock, greeting, password pill, session switcher, and power controls. |
 

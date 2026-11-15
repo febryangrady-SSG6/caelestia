@@ -40,10 +40,14 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/bar/popouts/BarComponentContext.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
         "$QS_TARGET/modules/bar/popouts/Greeter.qml"
+    install -Dm644 "$REPO_ROOT/shell/utils/Launch.qml" \
+        "$QS_TARGET/utils/Launch.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/PageDictionary.qml" \
         "$QS_TARGET/modules/nexus/PageDictionary.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/SessionPage.qml" \
         "$QS_TARGET/modules/nexus/pages/SessionPage.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/UpdatesPage.qml" \
+        "$QS_TARGET/modules/nexus/pages/UpdatesPage.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/panels/DashboardPanel.qml" \
         "$QS_TARGET/modules/nexus/pages/panels/DashboardPanel.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/session/Content.qml" \
@@ -158,6 +162,9 @@ def deep_merge(base, upd):
     for k, v in upd.items():
         if isinstance(v, dict) and isinstance(base.get(k), dict):
             deep_merge(base[k], v)
+        elif k == "hiddenApps" and isinstance(v, list) and isinstance(base.get(k), list):
+            seen = set(base[k])
+            base[k] = list(base[k]) + [x for x in v if x not in seen]
         else:
             base[k] = v
 
@@ -168,7 +175,7 @@ with open(dst_path, "w", encoding="utf-8") as f:
     f.write("\n")
 PY
 
-# 8. Set Helium as default browser if installed.
+# 8. Set Helium as default browser and Konsole as default KDE terminal if installed.
 if [[ -f /usr/share/applications/helium.desktop || -f "$HOME/.local/share/applications/helium.desktop" ]]; then
     if command -v xdg-settings >/dev/null 2>&1; then
         xdg-settings set default-web-browser helium.desktop || true
@@ -176,6 +183,10 @@ if [[ -f /usr/share/applications/helium.desktop || -f "$HOME/.local/share/applic
     if command -v xdg-mime >/dev/null 2>&1; then
         xdg-mime default helium.desktop text/html x-scheme-handler/http x-scheme-handler/https || true
     fi
+fi
+if command -v konsole >/dev/null 2>&1 && command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file kdeglobals --group General --key TerminalApplication konsole
+    kwriteconfig6 --file kdeglobals --group General --key TerminalService org.kde.konsole.desktop
 fi
 
 # 9. Cap systemd-logind pre-sleep delay lock wait + apply AMD AM5/ASRock wakeup fixes if present.

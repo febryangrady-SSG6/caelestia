@@ -16,8 +16,18 @@
         "apps": {
             "browser": [
                 "helium-browser"
+            ],
+            "terminal": [
+                "konsole"
             ]
         }
+    },
+    "launcher": {
+        "hiddenApps": [
+            "foot",
+            "footclient",
+            "foot-server"
+        ]
     },
     "paths": {
         "mediaGif": "root:/assets/kurukuru.gif"

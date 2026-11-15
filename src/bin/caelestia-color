@@ -654,6 +654,53 @@ def cmd_smart_variant(image: str) -> int:
     return 0
 
 
+def resolve_terminal_palette(colours: dict) -> list[str]:
+    """Return 16 readable `RRGGBB` ANSI terminal colours against `surface`."""
+
+    def valid(role: str, fallback: str = "") -> str:
+        value = str(colours.get(role) or "").lstrip("#").strip()
+        if len(value) == 6 and all(c in "0123456789abcdefABCDEF" for c in value):
+            return value.lower()
+        return fallback
+
+    bg = valid("surface", "1e1e2e")
+    fg = valid("onSurface", "cdd6f4")
+
+    # Container foreground roles (onPrimaryContainer/onTertiaryContainer) invert to near-black on
+    # light containers in some dark schemes, so fall back to high-contrast roles when needed.
+    slots = [
+        (["outlineVariant", "term0"], 0.0),
+        (["error", "term1", "onErrorContainer", "onSurface"], 4.5),
+        (["tertiary", "term2", "secondary", "onSurface"], 4.5),
+        (["secondary", "term3", "primary", "onSurface"], 4.5),
+        (["primary", "term4", "secondary", "onSurface"], 4.5),
+        (["tertiary", "term5", "primary", "onSurface"], 4.5),
+        (["onPrimaryContainer", "term6", "primary", "onSecondaryContainer", "onSurface"], 4.5),
+        (["onSurface", "term7", "onSurfaceVariant"], 4.5),
+        (["outline", "term8", "onSurfaceVariant", "onSurface"], 3.0),
+        (["onErrorContainer", "error", "term9", "onSurface"], 4.5),
+        (["onTertiaryContainer", "term10", "tertiary", "secondary", "onSurface"], 4.5),
+        (["onSecondaryContainer", "term11", "secondary", "onSurface"], 4.5),
+        (["onPrimaryContainer", "term12", "primary", "onSecondaryContainer", "onSurface"], 4.5),
+        (["onTertiaryContainer", "term13", "tertiary", "primary", "onSurface"], 4.5),
+        (["onSecondaryContainer", "term14", "primary", "onSurface"], 4.5),
+        (["onSurfaceVariant", "term15", "onSurface"], 4.5),
+    ]
+
+    result = []
+    for candidates, min_ratio in slots:
+        chosen = ""
+        for role in candidates:
+            hex_color = valid(role)
+            if not hex_color:
+                continue
+            if min_ratio <= 0 or contrast_ratio(hex_color, bg) >= min_ratio:
+                chosen = hex_color
+                break
+        result.append(chosen or fg)
+    return result
+
+
 def cmd_konsole_scheme(scheme_file: str, out: str) -> int:
     """Write a Konsole color scheme from the palette in effect.
 
@@ -663,11 +710,14 @@ def cmd_konsole_scheme(scheme_file: str, out: str) -> int:
     """
     colours = json.loads(pathlib.Path(scheme_file).read_text(encoding="utf-8"))["colours"]
 
+    def hex_to_triple(hex_color: str) -> str:
+        return ",".join(str(int(hex_color[index : index + 2], 16)) for index in (0, 2, 4))
+
     def triple(role: str, fallback: str) -> str:
         value = (colours.get(role) or fallback).lstrip("#")
         if len(value) != 6:
             value = fallback.lstrip("#")
-        return ",".join(str(int(value[index : index + 2], 16)) for index in (0, 2, 4))
+        return hex_to_triple(value)
 
     lines = [
         "[General]",
@@ -687,27 +737,8 @@ def cmd_konsole_scheme(scheme_file: str, out: str) -> int:
         f"Color={triple('onSurface', 'cdd6f4')}",
     ]
 
-    roles = [
-        "outlineVariant",
-        "error",
-        "tertiary",
-        "secondary",
-        "primary",
-        "tertiary",
-        "onPrimaryContainer",
-        "onSurface",
-        "outline",
-        "onErrorContainer",
-        "onTertiaryContainer",
-        "onSecondaryContainer",
-        "onPrimaryContainer",
-        "onTertiaryContainer",
-        "onSecondaryContainer",
-        "onSurfaceVariant",
-    ]
-
-    for index, role in enumerate(roles):
-        color = triple(role, "cdd6f4")
+    for index, hex_color in enumerate(resolve_terminal_palette(colours)):
+        color = hex_to_triple(hex_color)
         lines += [
             f"[Color{index}]",
             f"Color={color}",
@@ -718,6 +749,33 @@ def cmd_konsole_scheme(scheme_file: str, out: str) -> int:
         ]
 
     atomic_write(pathlib.Path(out), "\n".join(lines) + "\n")
+    return 0
+
+
+def cmd_terminal_sequences(scheme_file: str, out: str) -> int:
+    """Rewrite terminal OSC colour sequences with contrast-safe ANSI slots."""
+    colours = json.loads(pathlib.Path(scheme_file).read_text(encoding="utf-8"))["colours"]
+    palette = resolve_terminal_palette(colours)
+
+    def role_hex(role: str, fallback: str) -> str:
+        value = str(colours.get(role) or fallback).lstrip("#").strip()
+        return value if len(value) == 6 else fallback
+
+    order = [0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15]
+    parts = [f"\x1b]4;{idx};#{palette[idx]}\x1b\\" for idx in order]
+    surface = role_hex("surface", "1e1e2e")
+    on_surface = role_hex("onSurface", "cdd6f4")
+    sec_cont = role_hex("secondaryContainer", "313244")
+    on_sec_cont = role_hex("onSecondaryContainer", on_surface)
+    parts += [
+        f"\x1b]11;#{surface}\x1b\\",
+        f"\x1b]10;#{on_surface}\x1b\\",
+        f"\x1b]12;#{on_surface}\x1b\\",
+        f"\x1b]13;#{on_surface}\x1b\\",
+        f"\x1b]17;#{sec_cont}\x1b\\",
+        f"\x1b]19;#{on_sec_cont}\x1b\\",
+    ]
+    atomic_write(pathlib.Path(out), "".join(parts))
     return 0
 
 
@@ -947,6 +1005,8 @@ def main(argv: list[str]) -> int:
         return cmd_smart_variant(*args)
     if command == "konsole-scheme":
         return cmd_konsole_scheme(*args)
+    if command == "terminal-sequences":
+        return cmd_terminal_sequences(*args)
     if command == "kde-selection":
         return cmd_kde_selection(*args)
     if command == "resolve-thumb":
@@ -1335,6 +1395,7 @@ apply_to_desktop() {
     fi
 
     if enabled enableTerm; then
+        py terminal-sequences "$SCHEME_FILE" "$CACHE_HOME/caelestia/terminal-sequences" || warn "could not write terminal sequences"
         apply_terms "$CACHE_HOME/caelestia/terminal-sequences"
     fi
 

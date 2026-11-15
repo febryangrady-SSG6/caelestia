@@ -110,6 +110,14 @@ bash ~/caelestia-kde/custom/apply.sh
    - **File:** `shell/modules/launcher/Content.qml`
    - **Summary:** Adds Material 3 `Elevation` plus opacity/scale `enter` (`0.88 -> 1`) and `exit` (`1 -> 0.92`) `Transition`s on `sessionConfirmPopup` so it pops in and dismisses smoothly.
 
+16. **`0016-feat-session-add-Sleep-action-confirmations-hibernat.patch`**
+   - **Files:** `shell/services/SessionOptions.qml` (new), `shell/modules/session/Content.qml`, `shell/modules/nexus/pages/SessionPage.qml`, `shell/modules/nexus/PageDictionary.qml`
+   - **Summary:**
+     - Adds a **Sleep** button (`["suspend"]`, immediate) to the Ctrl+Alt+Del session menu (`modules/session/Content.qml`).
+     - Adds an animated modal confirmation popup (`sessionConfirmPopup` with `Elevation` and scale/fade `enter`/`exit` transitions on `Overlay.overlay`) for **Log out**, **Shut down**, **Hibernate**, and **Restart**.
+     - Replaces the duplicate `caelestiaMode` dino images with `Config.paths.sessionGif || "root:/assets/dino.gif"` (keeping monochrome `Colouriser` only for `dino.gif`).
+     - Adds `SessionOptions` (`QtCore.Settings` `[Session].showHibernate`) and controls in Nexus **Session** (`SessionPage.qml`) to toggle **Show hibernate** and select **Session GIF** (`Dino`, `Kuru Kuru`, `Bongo Cat`, or custom GIF via `FileDialog`).
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

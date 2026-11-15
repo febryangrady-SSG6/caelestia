@@ -39,6 +39,15 @@ Item {
             Quickshell.execDetached(command);
     }
 
+    function requestSessionConfirmation(title: string, message: string, confirmText: string, destructive: bool, command: list<string>): void {
+        sessionConfirmPopup.confirmTitle = title;
+        sessionConfirmPopup.confirmMessage = message;
+        sessionConfirmPopup.confirmText = confirmText;
+        sessionConfirmPopup.destructive = destructive;
+        sessionConfirmPopup.pendingCommand = command;
+        sessionConfirmPopup.open();
+    }
+
     implicitWidth: listWrapper.width + padding * 2
     implicitHeight: listWrapper.height + sessionFooter.height + searchWrapper.height + listWrapper.anchors.bottomMargin + sessionFooter.anchors.bottomMargin + searchWrapper.anchors.bottomMargin
 
@@ -119,7 +128,13 @@ Item {
                     type: TextButton.Tonal
                     icon: "logout"
                     text: qsTr("Log Out")
-                    onClicked: root.triggerSessionCommand(["sh", "-c", "qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout 2>/dev/null"])
+                    onClicked: root.requestSessionConfirmation(
+                        qsTr("Log out?"),
+                        qsTr("Your current desktop session will end and unsaved work may be lost."),
+                        qsTr("Log Out"),
+                        false,
+                        ["sh", "-c", "qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout 2>/dev/null"]
+                    )
                 }
 
                 IconTextButton {
@@ -137,7 +152,13 @@ Item {
                     text: qsTr("Restart")
                     inactiveColour: Colours.palette.m3secondaryContainer
                     inactiveOnColour: Colours.palette.m3onSecondaryContainer
-                    onClicked: root.triggerSessionCommand(Config.session.commands.reboot)
+                    onClicked: root.requestSessionConfirmation(
+                        qsTr("Restart computer?"),
+                        qsTr("All open apps will close and the system will reboot."),
+                        qsTr("Restart"),
+                        false,
+                        Config.session.commands.reboot
+                    )
                 }
 
                 IconTextButton {
@@ -147,7 +168,13 @@ Item {
                     text: qsTr("Shut Down")
                     inactiveColour: Colours.palette.m3errorContainer
                     inactiveOnColour: Colours.palette.m3onErrorContainer
-                    onClicked: root.triggerSessionCommand(Config.session.commands.shutdown)
+                    onClicked: root.requestSessionConfirmation(
+                        qsTr("Shut down computer?"),
+                        qsTr("All open apps will close and the system will power off."),
+                        qsTr("Shut Down"),
+                        true,
+                        Config.session.commands.shutdown
+                    )
                 }
             }
         }
@@ -347,6 +374,8 @@ Item {
                         Windows.isSwitching = false;
                         Kwin.clearHighlight();
                         Wallpapers.stopPreview();
+                        sessionConfirmPopup.close();
+                        clearClipboardConfirmPopup.close();
                     }
                 }
 
@@ -541,6 +570,78 @@ Item {
         background: StyledRect {
             radius: Tokens.rounding.large
             color: Colours.palette.m3surfaceContainer
+        }
+    }
+
+    Popup {
+        id: sessionConfirmPopup
+
+        property string confirmTitle
+        property string confirmMessage
+        property string confirmText
+        property bool destructive
+        property list<string> pendingCommand: []
+
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: root.padding
+
+        onClosed: {
+            if (root.visibilities.launcher)
+                search.forceActiveFocus();
+        }
+
+        contentItem: ColumnLayout {
+            spacing: root.Tokens.spacing.medium
+
+            StyledText {
+                Layout.fillWidth: true
+                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
+                text: sessionConfirmPopup.confirmTitle
+                font: root.Tokens.font.body.builders.large.weight(Font.Medium).build()
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
+                text: sessionConfirmPopup.confirmMessage
+                color: Colours.palette.m3onSurfaceVariant
+                font: root.Tokens.font.body.small
+                wrapMode: Text.Wrap
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                spacing: root.Tokens.spacing.small
+
+                TextButton {
+                    text: qsTr("Cancel")
+                    onClicked: sessionConfirmPopup.close()
+                }
+
+                TextButton {
+                    text: sessionConfirmPopup.confirmText
+                    type: TextButton.Filled
+                    inactiveColour: sessionConfirmPopup.destructive ? Colours.palette.m3error : Colours.palette.m3primary
+                    inactiveOnColour: sessionConfirmPopup.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
+                    onClicked: {
+                        const cmd = sessionConfirmPopup.pendingCommand;
+                        sessionConfirmPopup.close();
+                        root.triggerSessionCommand(cmd);
+                    }
+                }
+            }
+        }
+
+        background: StyledRect {
+            radius: root.Tokens.rounding.large
+            color: Colours.palette.m3surfaceContainerHigh
+            border.width: 1
+            border.color: Colours.palette.m3outlineVariant
         }
     }
 }

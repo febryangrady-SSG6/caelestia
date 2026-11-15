@@ -1,0 +1,65 @@
+From 5bdb817f004811a5a0d82bff20a5ec973c4f7b61 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 03:09:53 +0700
+Subject: [PATCH] fix(dock): increase dock icon ratio to match Windows taskbar
+ sizing
+
+---
+ shell/modules/bar/components/Dock.qml                | 6 ++++--
+ shell/modules/nexus/pages/panels/taskbar/BarDock.qml | 2 +-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/shell/modules/bar/components/Dock.qml b/shell/modules/bar/components/Dock.qml
+index 3fc6e213..60916b80 100644
+--- a/shell/modules/bar/components/Dock.qml
++++ b/shell/modules/bar/components/Dock.qml
+@@ -27,7 +27,7 @@ Item {
+ 
+     property bool isDragging: false
+ 
+-    property real spacing: Tokens.spacing.medium
++    property real spacing: Tokens.spacing.small
+ 
+     property real padding: Tokens.padding.medium
+ 
+@@ -39,7 +39,7 @@ Item {
+     readonly property real configuredItemSize: Math.max(16, Math.min(effectiveThickness, Config.bar.dock.iconSize || 32))
+     // Icon size of a dock item. Derived from the configured item size rather than the
+     // delegate's laid-out width, which is still 0 while the delegate is being created.
+-    readonly property real iconSize: Math.round(configuredItemSize * 0.7 / 2) * 2
++    readonly property real iconSize: Math.max(16, Math.min(configuredItemSize - 4, Math.round(configuredItemSize * 0.88 / 2) * 2))
+ 
+     implicitWidth: bar.isHorizontal ? container.width : container.implicitWidth
+     implicitHeight: bar.isHorizontal ? container.implicitHeight : container.height
+@@ -652,6 +652,7 @@ Item {
+                         id: icon
+ 
+                         anchors.centerIn: parent
++                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
+                         implicitSize: root.iconSize
+                         source: modelData ? WinIcons.sourceFor(modelData.entry, modelData.appClass, modelData.iconName, modelData.pid ?? 0) : ""
+                         visible: !(Config.bar.dock.recolourIcons ?? false)
+@@ -666,6 +667,7 @@ Item {
+ 
+                     ColouredIcon {
+                         anchors.centerIn: parent
++                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
+                         implicitSize: root.iconSize
+                         source: icon.source
+                         colour: Colours.palette.m3secondary
+diff --git a/shell/modules/nexus/pages/panels/taskbar/BarDock.qml b/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
+index 8e3917dc..3eb8edef 100644
+--- a/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
++++ b/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
+@@ -58,7 +58,7 @@ PageBase {
+             reset: ({ node: GlobalConfig.bar.dock, setting: "iconSize" })
+             value: Config.bar.dock.iconSize
+             from: 20
+-            to: Math.max(20, Tokens.sizes.bar.innerWidth)
++            to: Math.max(20, Math.round(Tokens.sizes.bar.innerWidth * Math.max(1.0, !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0)))
+             stepSize: 2
+             onMoved: v => GlobalConfig.bar.dock.iconSize = v
+         }
+-- 
+2.56.1
+

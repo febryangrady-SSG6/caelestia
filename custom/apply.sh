@@ -36,6 +36,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/launcher/items/AppTile.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/components/Dock.qml" \
+        "$QS_TARGET/modules/bar/components/Dock.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/BarComponentContext.qml" \
         "$QS_TARGET/modules/bar/popouts/BarComponentContext.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
@@ -50,6 +52,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/nexus/pages/UpdatesPage.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/panels/DashboardPanel.qml" \
         "$QS_TARGET/modules/nexus/pages/panels/DashboardPanel.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/panels/taskbar/BarDock.qml" \
+        "$QS_TARGET/modules/nexus/pages/panels/taskbar/BarDock.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/session/Content.qml" \
         "$QS_TARGET/modules/session/Content.qml"
     install -Dm644 "$REPO_ROOT/shell/services/SessionOptions.qml" \

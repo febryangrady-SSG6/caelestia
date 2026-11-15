@@ -3,6 +3,9 @@
         "defaultProvider": "antigravity"
     },
     "bar": {
+        "dock": {
+            "iconSize": 40
+        },
         "greeter": {
             "afternoonGif": "root:/assets/bongocat.gif",
             "eveningGif": "root:/assets/kurukuru.gif",

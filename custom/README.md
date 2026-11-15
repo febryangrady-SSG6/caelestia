@@ -146,6 +146,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** Dock icons were still hard-clamped by the `40px` bar thickness (`Tokens.sizes.bar.innerWidth`) and `BarDock.qml` slider `to:` cap, and using `36px` icons inside a `40x40` highlight box inside a `40px` pill left only `2px` margin around icons and `0px` margin inside the pill.
    - **Fix:** Moves dock geometry helpers into `BarWidgets.qml`, treats `bar.dock.iconSize` directly as the icon size, adds proportional highlight tile padding (`Math.max(6, Math.round(iconSize * 0.16))` per side, `-2px` active icon offset, `2px` bottom dot inset), adds cross-axis padding (`Tokens.padding.extraSmall`) inside the dock pill, expands `BarWrapper.contentWidth` automatically when the dock is taller than `baseInnerThickness`, and opens the `BarDock.qml` slider range to `20..64` (default override `48`).
 
+23. **`0023-fix-nmqt-resolve-ethernet-interface-by-name-and-pass.patch`**
+   - **File:** `shell/plugin/src/Caelestia/Services/NmQt.cpp`
+   - **Problem:** Clicking **Connect** on a disconnected Ethernet interface (e.g. `enp9s0`) sent no D-Bus activation to NetworkManager: `refreshEthernetDevices()` left `connection` empty when disconnected, `connectEthernet` called `findNetworkInterface("enp9s0")` (which expects a D-Bus UNI path) and `findDeviceByIpFace("enp9s0")` (unreliable when disconnected), passed `interfaceName` instead of `dev->uni()` to `activateConnection()`, and didn't fall back to available/saved wired profiles. The same `findNetworkInterface`/`findDeviceByIpFace` bug affected `refreshWirelessDeviceDetails()` and `refreshEthernetDeviceDetails()`.
+   - **Fix:** Adds `findDeviceByIdentifier()` (matching UNI, `interfaceName()`, `ipInterfaceName()`, or `findDeviceByIpFace`), populates disconnected Ethernet `connection` from `availableConnections()`, updates `connectEthernet()` to pass `dev->uni()` and fall back cleanly through named connections, `availableConnections()`, matching `ConnectionSettings::Wired` profiles, and `addAndActivateConnection()`, and logs D-Bus activation failures (requires rebuilding `shell/plugin` if applying onto an existing checkout via Option B).
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

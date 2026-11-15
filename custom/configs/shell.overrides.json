@@ -18,5 +18,8 @@
                 "helium-browser"
             ]
         }
+    },
+    "paths": {
+        "mediaGif": "root:/assets/kurukuru.gif"
     }
 }

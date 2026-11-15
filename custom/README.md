@@ -88,6 +88,10 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `AppTile`'s selection highlight `StyledRect` had `anchors.margins: Tokens.spacing.extraSmall` (`4px` inset) while `tileArea` (`StateLayer`) filled the whole tile (`0px` inset), and `baseIconSize` + `content.y` consumed the full `92px` tile height with zero bottom padding, causing two-line app labels (e.g., `Helium Browser`) to touch/overlap the bottom border of the selection box.
    - **Fix:** Unified `StyledRect` with `tileArea` at `anchors.fill: parent` and added balanced vertical padding (`_verticalPadding` top/bottom) with centered `content.y` so multi-line labels stay cleanly padded inside the highlight box.
 
+11. **`0011-feat-dashboard-add-Media-GIF-selector-to-DashboardPa.patch`**
+   - **Files:** `shell/modules/nexus/pages/panels/DashboardPanel.qml`, `shell/modules/nexus/PageDictionary.qml`
+   - **Summary:** Adds a **Media GIF** preset selector (`Kuru Kuru`, `Bongo Cat`, `Dino`) via `SelectRow` and a **Custom media GIF** file picker (`FileDialog` for GIF/image files) via `NavRow` to Nexus Dashboard settings (`GlobalConfig.paths.mediaGif` + `GlobalConfig.save()`), indexed under `Media GIF` in `PageDictionary.qml`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)
@@ -100,7 +104,7 @@ bash ~/caelestia-kde/custom/apply.sh
 | **Inactive window opacity** | Sets `kwinrulesrc` `[caelestia-opacity] opacityinactive=100`, `opacityinactiverule=2` | Keeps non-focused windows opaque instead of semi-transparent. |
 | **Terminal (`foot`)** | Installs `custom/configs/foot.ini` (`shell=bash`) | Prevents desktop **Open Terminal** / `foot` from failing on unconfigured `fish`. |
 | **Keybinds** | Installs `custom/configs/keybinds.json` + updates `kglobalshortcutsrc` | `Meta+W` / `Meta+Tab` for Caelestia Overview (unbinding KDE's conflicting `Meta+W` Overview), `Print` + `Meta+Shift+S` for Screenshot. |
-| **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
+| **`shell.json` defaults** | Deep-merges `custom/configs/shell.overrides.json` into `~/.config/caelestia/shell.json` | Sets `ai.defaultProvider = "antigravity"`, default browser `helium-browser`, dashboard media GIF (`kurukuru.gif`), and bar greeter GIFs (`bongocat.gif` / `kurukuru.gif`) without clobbering chat history. |
 | **Default browser** | Sets `helium.desktop` via `xdg-settings` / `xdg-mime` if installed | Uses Helium Browser as default browser. |
 
 ---

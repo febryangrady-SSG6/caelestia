@@ -31,6 +31,10 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/bar/popouts/BarComponentContext.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
         "$QS_TARGET/modules/bar/popouts/Greeter.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/nexus/PageDictionary.qml" \
+        "$QS_TARGET/modules/nexus/PageDictionary.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/panels/DashboardPanel.qml" \
+        "$QS_TARGET/modules/nexus/pages/panels/DashboardPanel.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/sidebar/AiAssistant.qml" \
         "$QS_TARGET/modules/sidebar/AiAssistant.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/sidebar/Content.qml" \

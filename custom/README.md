@@ -68,6 +68,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `Menu.qml` had an unqualified `import QtQuick.Controls`, so `QtQuick.Controls.Menu` (`Right=5`, `Top=1`, `Bottom=7`) shadowed `Menu.qml`'s own `enum Side` (`Top=0, Bottom=1, Left=2, Right=3`) in the root `attachSideX`/`thisSideX` defaults (`5`), while child expressions/callers (`SplitButton.qml`) used `Side.Right` (`3`). Because `5 !== 3`, `thisSideX === Menu.Right` evaluated `false`, skipping `off -= width` and opening `SplitButton` dropdown menus (like Utilities Screen Capture) off the right edge of the button/screen.
    - **Fix:** Aliased `import QtQuick.Controls as Controls` (`Controls.ScrollBar.vertical`) so `Menu` enum values resolve consistently, used `menu.width` / `menu.height` explicitly, and clamped `menu.x` within `[0, root.parent.width - menu.implicitWidth]`.
 
+7. **`0007-fix-menu-auto-close-when-anchor-or-utilities-drawer-.patch`**
+   - **Files:** `shell/components/controls/Menu.qml`, `shell/modules/utilities/cards/CaptureCard.qml`
+   - **Problem:** Because `Menu` reparents itself onto `Interactions` so it isn't clipped by parent containers, closing the `Utilities` drawer on unhover (or hiding any anchor/parent container) left an open `SplitButton` context menu floating over the screen.
+   - **Fix:** Added an `attachTo.onVisibleChanged` / `onExpandedChanged` visibility guard in `Menu.qml` to close immediately when `attachTo` hides, and collapsed `recordSplitBtn.expanded` / `shotSplitBtn.expanded` immediately on `!visibilities.utilities` in `CaptureCard.qml`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

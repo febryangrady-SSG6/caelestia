@@ -1,0 +1,68 @@
+From 20d77105ff2b04d5cfecd4f458129d892c027ecf Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:49:08 +0700
+Subject: [PATCH] fix(menu): auto-close when anchor or utilities drawer hides
+
+---
+ shell/components/controls/Menu.qml            | 17 +++++++++++++++++
+ shell/modules/utilities/cards/CaptureCard.qml |  5 ++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/shell/components/controls/Menu.qml b/shell/components/controls/Menu.qml
+index 90565573..130c4768 100644
+--- a/shell/components/controls/Menu.qml
++++ b/shell/components/controls/Menu.qml
+@@ -154,9 +154,14 @@ MouseArea {
+     }
+ 
+     onExpandedChanged: {
++        if (expanded && root.attachTo && !root.attachTo.visible) {
++            expanded = false;
++            return;
++        }
+         if (expanded) {
+             closeTimer.stop();
+         } else {
++            submenuOpen = false;
+             submenuRow = null;
+             submenuItems = [];
+         }
+@@ -170,6 +175,18 @@ MouseArea {
+             revealOut.start();
+     }
+ 
++    Connections {
++        function onVisibleChanged(): void {
++            if (root.expanded && !root.attachTo?.visible) {
++                closeTimer.stop();
++                root.submenuOpen = false;
++                root.expanded = false;
++            }
++        }
++
++        target: root.attachTo
++    }
++
+     parent: {
+         let node = root.attachTo;
+         let interactionsNode = null;
+diff --git a/shell/modules/utilities/cards/CaptureCard.qml b/shell/modules/utilities/cards/CaptureCard.qml
+index a4331629..7a3a60bc 100644
+--- a/shell/modules/utilities/cards/CaptureCard.qml
++++ b/shell/modules/utilities/cards/CaptureCard.qml
+@@ -35,8 +35,11 @@ StyledRect {
+ 
+     Connections {
+         function onUtilitiesChanged(): void {
+-            if (!root.visibilities.utilities)
++            if (!root.visibilities.utilities) {
+                 root.expanded = false;
++                recordSplitBtn.expanded = false;
++                shotSplitBtn.expanded = false;
++            }
+         }
+ 
+         target: root.visibilities
+-- 
+2.56.1
+

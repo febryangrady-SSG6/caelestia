@@ -19,6 +19,8 @@ if [[ -d "$QS_TARGET" ]]; then
     log "Syncing patched shell QML/JS files to $QS_TARGET"
     install -Dm644 "$REPO_ROOT/shell/components/controls/Menu.qml" \
         "$QS_TARGET/components/controls/Menu.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/utilities/cards/CaptureCard.qml" \
+        "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \

@@ -33,50 +33,38 @@ Popup {
     }
 
     function updatePosition() {
-        if (!target || !parent)
+        if (!target || !parent || !tooltipRect)
             return;
 
-        Qt.callLater(() => {
-            if (!target || !parent || !tooltipRect)
-                return;
+        const targetPos = target.mapToItem(parent, 0, 0);
+        const targetCenterX = targetPos.x + target.width / 2;
 
-            const targetPos = target.mapToItem(parent, 0, 0);
-            const targetCenterX = targetPos.x + target.width / 2;
+        // Get tooltip size (use width/height if available, otherwise implicit)
+        const tooltipWidth = tooltipRect.width > 0 ? tooltipRect.width : tooltipRect.implicitWidth;
+        const tooltipHeight = tooltipRect.height > 0 ? tooltipRect.height : tooltipRect.implicitHeight;
 
-            // Get tooltip size (use width/height if available, otherwise implicit)
-            const tooltipWidth = tooltipRect.width > 0 ? tooltipRect.width : tooltipRect.implicitWidth;
-            const tooltipHeight = tooltipRect.height > 0 ? tooltipRect.height : tooltipRect.implicitHeight;
+        let newX = targetCenterX - tooltipWidth / 2;
+        let newY = targetPos.y - tooltipHeight - Tokens.spacing.small;
 
-            let newX = targetCenterX - tooltipWidth / 2;
+        const padding = Tokens.padding.medium;
+        const maxX = Math.max(padding, parent.width - tooltipWidth - padding);
+        newX = CUtils.clamp(newX, padding, maxX);
+        // Above the target by default; below it when there is no room above (a
+        // top bar's widgets), so a tooltip never lands off the screen.
+        if (newY < padding) {
+            const maxY = Math.max(padding, parent.height - tooltipHeight - padding);
+            newY = CUtils.clamp(targetPos.y + target.height + Tokens.spacing.small, padding, maxY);
+        }
 
-            let newY = targetPos.y - tooltipHeight - Tokens.spacing.small;
-
-            const padding = Tokens.padding.medium;
-            newX = CUtils.clamp(newX, padding, parent.width - tooltipWidth - padding);
-            // Above the target by default; below it when there is no room above (a
-            // top bar's widgets), so a tooltip never lands off the screen.
-            if (newY < padding) {
-                newY = CUtils.clamp(targetPos.y + target.height + Tokens.spacing.small, padding, parent.height - tooltipHeight - padding);
-            }
-
-            x = newX;
-            y = newY;
-        });
+        x = newX;
+        y = newY;
     }
 
     parent: {
         let p = target;
-        if (!p)
-            return null;
-        while (p && p.parent) {
-            const parentItem = p.parent;
-            if (parentItem && parentItem.anchors && parentItem.anchors.fill !== undefined) {
-                return parentItem;
-            }
-            p = parentItem;
-        }
-        // Fallback
-        return target.parent?.parent?.parent ?? target.parent?.parent ?? target.parent ?? target ?? null;
+        while (p && p.parent)
+            p = p.parent;
+        return p ?? null;
     }
 
     visible: tooltipVisible
@@ -88,6 +76,7 @@ Popup {
 
     onTooltipVisibleChanged: {
         if (tooltipVisible) {
+            updatePosition();
             Qt.callLater(updatePosition);
         }
     }
@@ -177,13 +166,19 @@ Popup {
 
     Connections {
         function onHoveredChanged() {
-            if (target.hovered) {
-                showTimer.start();
+            if (target.hovered && target.visible) {
+                showTimer.restart();
                 if (timeout > 0) {
-                    hideTimer.stop();
-                    hideTimer.start();
+                    hideTimer.restart();
                 }
             } else {
+                showTimer.stop();
+                hideTimer.stop();
+                tooltipVisible = false;
+            }
+        }
+        function onVisibleChanged() {
+            if (!target.visible) {
                 showTimer.stop();
                 hideTimer.stop();
                 tooltipVisible = false;

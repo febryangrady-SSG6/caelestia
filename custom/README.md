@@ -106,6 +106,10 @@ bash ~/caelestia-kde/custom/apply.sh
    - **File:** `shell/modules/launcher/Content.qml`
    - **Summary:** Adds a modal confirmation dialog (`sessionConfirmPopup` via `requestSessionConfirmation`) when clicking **Log Out**, **Restart**, or **Shut Down** in the Launcher power menu footer (leaving **Sleep** immediate), with destructive error styling for **Shut Down** and automatic dismissal when the launcher closes.
 
+15. **`0015-feat-launcher-animate-session-confirmation-popup-ent.patch`**
+   - **File:** `shell/modules/launcher/Content.qml`
+   - **Summary:** Adds Material 3 `Elevation` plus opacity/scale `enter` (`0.88 -> 1`) and `exit` (`1 -> 0.92`) `Transition`s on `sessionConfirmPopup` so it pops in and dismisses smoothly.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

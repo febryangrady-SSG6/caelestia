@@ -23,7 +23,9 @@ Item {
     readonly property string position: Config.bar.position
     readonly property real barScale: Math.max(0.6, !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0)
     readonly property int padding: Math.max(Tokens.padding.small, Config.border.thickness)
-    readonly property int contentWidth: Math.round(Tokens.sizes.bar.innerWidth * barScale) + padding * 2
+    readonly property int baseInnerThickness: Math.round(Tokens.sizes.bar.innerWidth * barScale)
+    readonly property int dockThickness: BarWidgets.dockThicknessFor(Config.bar, baseInnerThickness, Tokens.padding.extraSmall)
+    readonly property int contentWidth: Math.max(baseInnerThickness, dockThickness) + padding * 2
     readonly property bool dodgeEnabled: Config.bar.dodgeWindows && Config.bar.persistent && !disabled
     // The strip the bar occupies, in the absolute multi-monitor coordinates
     // KWin reports window geometry in — hence the screen origin offset.

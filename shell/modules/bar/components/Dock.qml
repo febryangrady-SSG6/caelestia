@@ -15,6 +15,7 @@ import qs.components.effects
 import qs.components.images
 import qs.services
 import qs.utils
+import qs.modules.bar
 
 Item {
     id: root
@@ -27,19 +28,18 @@ Item {
 
     property bool isDragging: false
 
-    property real spacing: Tokens.spacing.small
+    property real spacing: Tokens.spacing.extraSmall
 
-    property real padding: Tokens.padding.medium
+    property real padding: Math.max(Tokens.padding.medium, Math.round(configuredItemSize * 0.22))
 
     readonly property real rawScale: !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0
     readonly property real scaleFactor: rawScale < 1.0 ? Math.sqrt(Math.max(0.1, rawScale)) : rawScale
     readonly property int barThickness: Math.round(Tokens.sizes.bar.innerWidth * scaleFactor)
     readonly property int baseThickness: Tokens.sizes.bar.innerWidth
     readonly property int effectiveThickness: rawScale < 1.0 ? baseThickness : barThickness
-    readonly property real configuredItemSize: Math.max(16, Math.min(effectiveThickness, Config.bar.dock.iconSize || 32))
-    // Icon size of a dock item. Derived from the configured item size rather than the
-    // delegate's laid-out width, which is still 0 while the delegate is being created.
-    readonly property real iconSize: Math.max(16, Math.min(configuredItemSize - 4, Math.round(configuredItemSize * 0.88 / 2) * 2))
+    readonly property real iconSize: BarWidgets.dockIconSize(Config.bar.dock.iconSize)
+    readonly property real configuredItemSize: BarWidgets.dockItemSize(iconSize)
+    readonly property int containerThickness: BarWidgets.dockContainerThickness(effectiveThickness, configuredItemSize, Tokens.padding.extraSmall)
 
     implicitWidth: bar.isHorizontal ? container.width : container.implicitWidth
     implicitHeight: bar.isHorizontal ? container.implicitHeight : container.height
@@ -287,8 +287,8 @@ Item {
 
         property real __computedContentWidth: __itemCount > 0 ? __itemCount * itemSize + (__itemCount - 1) * root.spacing : 0
 
-        implicitWidth: bar.isHorizontal ? (__computedContentWidth + padding * 2) : bar.thickness
-        implicitHeight: bar.isHorizontal ? bar.thickness : (__computedContentWidth + padding * 2)
+        implicitWidth: bar.isHorizontal ? (__computedContentWidth + padding * 2) : root.containerThickness
+        implicitHeight: bar.isHorizontal ? root.containerThickness : (__computedContentWidth + padding * 2)
 
         width: bar.isHorizontal ? Math.min(implicitWidth, maxHorizontalSize) : implicitWidth
         height: !bar.isHorizontal ? Math.min(implicitHeight, maxVerticalSize) : implicitHeight
@@ -455,7 +455,7 @@ Item {
                 anchors.left: listView.left
                 anchors.right: listView.right
                 anchors.bottom: listView.bottom
-                anchors.bottomMargin: -root.padding + 2
+                anchors.bottomMargin: -Tokens.padding.extraSmall + 1
                 visible: bar.isHorizontal && listView.contentWidth > listView.width + 1
             }
 
@@ -468,7 +468,7 @@ Item {
                 anchors.top: listView.top
                 anchors.bottom: listView.bottom
                 anchors.right: listView.right
-                anchors.rightMargin: -root.padding + 2
+                anchors.rightMargin: -Tokens.padding.extraSmall + 1
                 visible: !bar.isHorizontal && listView.contentHeight > listView.height + 1
             }
         }
@@ -652,7 +652,7 @@ Item {
                         id: icon
 
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
+                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -2 : 0
                         implicitSize: root.iconSize
                         source: modelData ? WinIcons.sourceFor(modelData.entry, modelData.appClass, modelData.iconName, modelData.pid ?? 0) : ""
                         visible: !(Config.bar.dock.recolourIcons ?? false)
@@ -667,7 +667,7 @@ Item {
 
                     ColouredIcon {
                         anchors.centerIn: parent
-                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
+                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -2 : 0
                         implicitSize: root.iconSize
                         source: icon.source
                         colour: Colours.palette.m3secondary
@@ -742,7 +742,7 @@ Item {
                     ListView {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottomMargin: 0
+                        anchors.bottomMargin: 2
                         spacing: 2
                         orientation: ListView.Horizontal
                         interactive: false

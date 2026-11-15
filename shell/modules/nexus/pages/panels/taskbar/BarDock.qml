@@ -58,7 +58,7 @@ PageBase {
             reset: ({ node: GlobalConfig.bar.dock, setting: "iconSize" })
             value: Config.bar.dock.iconSize
             from: 20
-            to: Math.max(20, Math.round(Tokens.sizes.bar.innerWidth * Math.max(1.0, !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0)))
+            to: 64
             stepSize: 2
             onMoved: v => GlobalConfig.bar.dock.iconSize = v
         }

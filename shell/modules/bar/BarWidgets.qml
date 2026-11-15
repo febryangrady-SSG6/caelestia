@@ -124,6 +124,31 @@ QtObject {
         node.resetOption("entries");
     }
 
+    function dockIconSize(configuredSize: real): int {
+        const raw = configuredSize > 0 ? configuredSize : 32;
+        return Math.max(16, Math.round(raw / 2) * 2);
+    }
+
+    function dockItemSize(iconSize: real): int {
+        // Leave enough margin around the icon so the highlight tile never
+        // cramps full-bleed squircle icons or the bottom running indicator.
+        const pad = Math.max(6, Math.round(iconSize * 0.16));
+        return Math.round(iconSize + pad * 2);
+    }
+
+    function dockContainerThickness(baseThickness: real, itemSize: real, crossPadding: real): int {
+        // Keep cross-axis padding inside the dock pill around each highlight
+        // tile so the highlight never sits flush against the pill edge.
+        return Math.max(Math.round(baseThickness), Math.round(itemSize + crossPadding * 2));
+    }
+
+    function dockThicknessFor(barConfig: var, baseThickness: real, crossPadding: real): int {
+        if (!isEnabled(barConfig, "dock"))
+            return 0;
+        const iconSize = dockIconSize(barConfig.dock?.iconSize ?? 32);
+        return dockContainerThickness(baseThickness, dockItemSize(iconSize), crossPadding);
+    }
+
     function indexFor(entries: var, id: string): int {
         const target = root.widget(id);
         if (target === null)

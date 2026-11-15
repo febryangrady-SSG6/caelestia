@@ -111,6 +111,7 @@ ColumnLayout {
 
             StyledText {
                 Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
                 text: row.labelText
                 color: Colours.palette.m3onSurface
                 font.pointSize: Tokens.font.body.medium.pointSize * root.fontScale

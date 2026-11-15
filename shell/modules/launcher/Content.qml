@@ -574,120 +574,16 @@ Item {
         }
     }
 
-    Popup {
+    SessionConfirmPopup {
         id: sessionConfirmPopup
 
-        property string confirmTitle
-        property string confirmMessage
-        property string confirmText
-        property bool destructive
-        property list<string> pendingCommand: []
-
-        modal: true
-        focus: true
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-        x: Math.round((root.width - width) / 2)
-        y: Math.round((root.height - height) / 2)
+        tokens: root.Tokens
         padding: root.padding
-
-        enter: Transition {
-            NumberAnimation {
-                property: "opacity"
-                from: 0
-                to: 1
-                duration: root.Tokens.anim.durations.expressiveDefaultEffects
-                easing: root.Tokens.anim.expressiveDefaultEffects
-            }
-            NumberAnimation {
-                property: "scale"
-                from: 0.88
-                to: 1
-                duration: root.Tokens.anim.durations.expressiveFastSpatial
-                easing: root.Tokens.anim.expressiveFastSpatial
-            }
-        }
-
-        exit: Transition {
-            NumberAnimation {
-                property: "opacity"
-                from: 1
-                to: 0
-                duration: root.Tokens.anim.durations.expressiveFastEffects
-                easing: root.Tokens.anim.expressiveFastEffects
-            }
-            NumberAnimation {
-                property: "scale"
-                from: 1
-                to: 0.92
-                duration: root.Tokens.anim.durations.expressiveFastEffects
-                easing: root.Tokens.anim.expressiveFastEffects
-            }
-        }
-
+        maxMessageWidth: Math.max(240, root.width - root.padding * 4)
+        onConfirmed: command => root.triggerSessionCommand(command)
         onClosed: {
             if (root.visibilities.launcher)
                 search.forceActiveFocus();
-        }
-
-        contentItem: ColumnLayout {
-            spacing: root.Tokens.spacing.medium
-
-            StyledText {
-                Layout.fillWidth: true
-                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
-                text: sessionConfirmPopup.confirmTitle
-                font: root.Tokens.font.body.builders.large.weight(Font.Medium).build()
-            }
-
-            StyledText {
-                Layout.fillWidth: true
-                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
-                text: sessionConfirmPopup.confirmMessage
-                color: Colours.palette.m3onSurfaceVariant
-                font: root.Tokens.font.body.small
-                wrapMode: Text.Wrap
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignRight
-                spacing: root.Tokens.spacing.small
-
-                TextButton {
-                    text: qsTr("Cancel")
-                    onClicked: sessionConfirmPopup.close()
-                }
-
-                TextButton {
-                    text: sessionConfirmPopup.confirmText
-                    type: TextButton.Filled
-                    inactiveColour: sessionConfirmPopup.destructive ? Colours.palette.m3error : Colours.palette.m3primary
-                    inactiveOnColour: sessionConfirmPopup.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
-                    onClicked: {
-                        const cmd = sessionConfirmPopup.pendingCommand;
-                        sessionConfirmPopup.close();
-                        root.triggerSessionCommand(cmd);
-                    }
-                }
-            }
-        }
-
-        background: Item {
-            Elevation {
-                anchors.fill: sessionBgRect
-                level: 3
-                radius: sessionBgRect.radius
-            }
-
-            StyledRect {
-                id: sessionBgRect
-
-                anchors.fill: parent
-                radius: root.Tokens.rounding.large
-                color: Colours.palette.m3surfaceContainerHigh
-                border.width: 1
-                border.color: Colours.palette.m3outlineVariant
-            }
         }
     }
 }

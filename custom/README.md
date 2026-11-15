@@ -97,6 +97,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `ContentList`'s `Behavior on state` gated `enabled` on `&& root.opacity === 1`. As soon as the state transition fade-out reduced `opacity` below `1`, `enabled` flipped to `false`, so closing the launcher or switching modes (e.g., `Alt+Tab` `windowSwitcher`, `>wallpaper `, etc.) while mid-fade aborted the `SequentialAnimation` cleanly before the `to: 1` fade-in ran—leaving `ContentList` permanently dimmed (`opacity < 1`) until Quickshell restarted.
    - **Fix:** Removed `root.opacity === 1` from `Behavior on state`'s `enabled` condition, dropped the hardcoded `from: 1` on fade-out, and guaranteed `root.opacity = 1` whenever `stateTransitionAnim` stops (`onRunningChanged`), `state` changes with the behavior disabled (`onStateChanged`), or the launcher opens (`onLauncherChanged`).
 
+13. **`0013-fix-utilities-import-qs.services-for-DrawerConfirmMo.patch`**
+   - **File:** `shell/modules/utilities/DrawerConfirmModal.qml`
+   - **Problem:** `DrawerConfirmModal.qml` referenced `Colours.palette.m3onSurfaceVariant` for the confirmation dialog body text without importing `qs.services`, causing `Colours` to fail lookup and fall back to `#000000` black text on dark surfaces (e.g. `Delete recording?`).
+   - **Fix:** Added `import qs.services`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

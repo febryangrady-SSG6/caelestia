@@ -21,6 +21,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/components/controls/Menu.qml"
     install -Dm644 "$REPO_ROOT/shell/components/controls/Tooltip.qml" \
         "$QS_TARGET/components/controls/Tooltip.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/utilities/DrawerConfirmModal.qml" \
+        "$QS_TARGET/modules/utilities/DrawerConfirmModal.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/utilities/cards/CaptureCard.qml" \
         "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/ContentList.qml" \

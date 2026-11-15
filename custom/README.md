@@ -151,6 +151,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** Clicking **Connect** on a disconnected Ethernet interface (e.g. `enp9s0`) sent no D-Bus activation to NetworkManager: `refreshEthernetDevices()` left `connection` empty when disconnected, `connectEthernet` called `findNetworkInterface("enp9s0")` (which expects a D-Bus UNI path) and `findDeviceByIpFace("enp9s0")` (unreliable when disconnected), passed `interfaceName` instead of `dev->uni()` to `activateConnection()`, and didn't fall back to available/saved wired profiles. The same `findNetworkInterface`/`findDeviceByIpFace` bug affected `refreshWirelessDeviceDetails()` and `refreshEthernetDeviceDetails()`.
    - **Fix:** Adds `findDeviceByIdentifier()` (matching UNI, `interfaceName()`, `ipInterfaceName()`, or `findDeviceByIpFace`), populates disconnected Ethernet `connection` from `availableConnections()`, updates `connectEthernet()` to pass `dev->uni()` and fall back cleanly through named connections, `availableConnections()`, matching `ConnectionSettings::Wired` profiles, and `addAndActivateConnection()`, and logs D-Bus activation failures (requires rebuilding `shell/plugin` if applying onto an existing checkout via Option B).
 
+24. **`0024-fix-session-add-keyboard-navigation-and-focus-ring-t.patch`**
+   - **Files:** `shell/components/controls/SessionConfirmPopup.qml` (new), `shell/modules/session/Content.qml`, `shell/modules/launcher/Content.qml`
+   - **Problem:** The session action confirmation popup (`Log out?`, `Shut down computer?`, `Hibernate computer?`, `Restart computer?`) neither focused a button on open nor handled arrow/`Tab`/`Enter`/`Space`/`Escape` keys, `Cancel` defaulted to `TextButton.Filled` looking identical to the confirm button, and `TextButton`/`ButtonBase` had no visible keyboard focus ring.
+   - **Fix:** Extracts a shared `SessionConfirmPopup` component (`Tonal` **Cancel** focused safely on open + `Filled` confirm button), adds full keyboard navigation (`Left`/`Right`/`Tab`/`Backtab`/`H`/`L` to switch buttons, `Enter`/`Return`/`Space` to activate, `Esc` to dismiss), and renders a 2px `m3onSurface` outer focus ring + radius shift on whichever button currently holds `activeFocus`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

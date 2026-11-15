@@ -1,0 +1,482 @@
+From 8494b0e3501ed97f7b68c5256d7a4ac9235e3ef1 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 04:01:16 +0700
+Subject: [PATCH] fix(session): add keyboard navigation and focus ring to
+ confirmation popup
+
+---
+ .../controls/SessionConfirmPopup.qml          | 200 ++++++++++++++++++
+ shell/modules/launcher/Content.qml            | 112 +---------
+ shell/modules/session/Content.qml             | 111 +---------
+ 3 files changed, 207 insertions(+), 216 deletions(-)
+ create mode 100644 shell/components/controls/SessionConfirmPopup.qml
+
+diff --git a/shell/components/controls/SessionConfirmPopup.qml b/shell/components/controls/SessionConfirmPopup.qml
+new file mode 100644
+index 00000000..f0932d24
+--- /dev/null
++++ b/shell/components/controls/SessionConfirmPopup.qml
+@@ -0,0 +1,200 @@
++pragma ComponentBehavior: Bound
++
++import QtQuick
++import QtQuick.Controls
++import QtQuick.Layouts
++import qs.components
++import qs.components.effects
++import qs.services
++
++Popup {
++    id: root
++
++    required property var tokens
++    property string confirmTitle
++    property string confirmMessage
++    property string confirmText
++    property bool destructive
++    property list<string> pendingCommand: []
++    property real maxMessageWidth: 320
++
++    signal confirmed(list<string> command)
++
++    function acceptConfirm(): void {
++        const cmd = root.pendingCommand;
++        root.close();
++        root.confirmed(cmd);
++    }
++
++    modal: true
++    focus: true
++    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
++
++    x: parent ? Math.round((parent.width - width) / 2) : 0
++    y: parent ? Math.round((parent.height - height) / 2) : 0
++    padding: root.tokens.padding.large
++
++    onOpened: {
++        cancelBtn.forceActiveFocus();
++        Qt.callLater(() => {
++            if (root.opened)
++                cancelBtn.forceActiveFocus();
++        });
++    }
++
++    enter: Transition {
++        NumberAnimation {
++            property: "opacity"
++            from: 0
++            to: 1
++            duration: root.tokens.anim.durations.expressiveDefaultEffects
++            easing: root.tokens.anim.expressiveDefaultEffects
++        }
++        NumberAnimation {
++            property: "scale"
++            from: 0.88
++            to: 1
++            duration: root.tokens.anim.durations.expressiveFastSpatial
++            easing: root.tokens.anim.expressiveFastSpatial
++        }
++    }
++
++    exit: Transition {
++        NumberAnimation {
++            property: "opacity"
++            from: 1
++            to: 0
++            duration: root.tokens.anim.durations.expressiveFastEffects
++            easing: root.tokens.anim.expressiveFastEffects
++        }
++        NumberAnimation {
++            property: "scale"
++            from: 1
++            to: 0.92
++            duration: root.tokens.anim.durations.expressiveFastEffects
++            easing: root.tokens.anim.expressiveFastEffects
++        }
++    }
++
++    contentItem: ColumnLayout {
++        spacing: root.tokens.spacing.medium
++
++        Keys.onPressed: event => {
++            if (event.key === Qt.Key_Escape) {
++                root.close();
++                event.accepted = true;
++            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Right || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab || event.key === Qt.Key_H || event.key === Qt.Key_L) {
++                cancelBtn.forceActiveFocus();
++                event.accepted = true;
++            }
++        }
++
++        StyledText {
++            Layout.fillWidth: true
++            Layout.maximumWidth: root.maxMessageWidth
++            text: root.confirmTitle
++            font: root.tokens.font.body.builders.large.weight(Font.Medium).build()
++        }
++
++        StyledText {
++            Layout.fillWidth: true
++            Layout.maximumWidth: root.maxMessageWidth
++            text: root.confirmMessage
++            color: Colours.palette.m3onSurfaceVariant
++            font: root.tokens.font.body.small
++            wrapMode: Text.Wrap
++        }
++
++        RowLayout {
++            Layout.alignment: Qt.AlignRight
++            spacing: root.tokens.spacing.small
++
++            PopupButton {
++                id: cancelBtn
++
++                text: qsTr("Cancel")
++                type: TextButton.Tonal
++                focus: true
++                oppositeButton: confirmBtn
++                onClicked: root.close()
++            }
++
++            PopupButton {
++                id: confirmBtn
++
++                text: root.confirmText
++                type: TextButton.Filled
++                oppositeButton: cancelBtn
++                inactiveColour: root.destructive ? Colours.palette.m3error : Colours.palette.m3primary
++                inactiveOnColour: root.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
++                activeColour: inactiveColour
++                activeOnColour: inactiveOnColour
++                onClicked: root.acceptConfirm()
++            }
++        }
++    }
++
++    background: Item {
++        Elevation {
++            anchors.fill: bgRect
++            level: 3
++            radius: bgRect.radius
++        }
++
++        StyledRect {
++            id: bgRect
++
++            anchors.fill: parent
++            radius: root.tokens.rounding.large
++            color: Colours.palette.m3surfaceContainerHigh
++            border.width: 1
++            border.color: Colours.palette.m3outlineVariant
++        }
++    }
++
++    component PopupButton: TextButton {
++        id: btn
++
++        property Item oppositeButton: null
++
++        activeFocusOnTab: true
++        checked: btn.activeFocus
++        internalChecked: btn.activeFocus
++
++        Keys.onPressed: event => {
++            switch (event.key) {
++            case Qt.Key_Left:
++            case Qt.Key_Right:
++            case Qt.Key_Tab:
++            case Qt.Key_Backtab:
++            case Qt.Key_H:
++            case Qt.Key_L:
++                if (oppositeButton)
++                    oppositeButton.forceActiveFocus();
++                event.accepted = true;
++                break;
++            case Qt.Key_Return:
++            case Qt.Key_Enter:
++            case Qt.Key_Space:
++                btn.clicked();
++                event.accepted = true;
++                break;
++            case Qt.Key_Escape:
++                root.close();
++                event.accepted = true;
++                break;
++            }
++        }
++
++        Rectangle {
++            anchors.fill: parent
++            anchors.margins: -3
++            radius: btn.radius + 3
++            color: "transparent"
++            border.width: 2
++            border.color: Colours.palette.m3onSurface
++            visible: btn.activeFocus
++            z: 2
++        }
++    }
++}
+diff --git a/shell/modules/launcher/Content.qml b/shell/modules/launcher/Content.qml
+index fab5cb68..bb51c5ca 100644
+--- a/shell/modules/launcher/Content.qml
++++ b/shell/modules/launcher/Content.qml
+@@ -574,120 +574,16 @@ Item {
+         }
+     }
+ 
+-    Popup {
++    SessionConfirmPopup {
+         id: sessionConfirmPopup
+ 
+-        property string confirmTitle
+-        property string confirmMessage
+-        property string confirmText
+-        property bool destructive
+-        property list<string> pendingCommand: []
+-
+-        modal: true
+-        focus: true
+-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+-
+-        x: Math.round((root.width - width) / 2)
+-        y: Math.round((root.height - height) / 2)
++        tokens: root.Tokens
+         padding: root.padding
+-
+-        enter: Transition {
+-            NumberAnimation {
+-                property: "opacity"
+-                from: 0
+-                to: 1
+-                duration: root.Tokens.anim.durations.expressiveDefaultEffects
+-                easing: root.Tokens.anim.expressiveDefaultEffects
+-            }
+-            NumberAnimation {
+-                property: "scale"
+-                from: 0.88
+-                to: 1
+-                duration: root.Tokens.anim.durations.expressiveFastSpatial
+-                easing: root.Tokens.anim.expressiveFastSpatial
+-            }
+-        }
+-
+-        exit: Transition {
+-            NumberAnimation {
+-                property: "opacity"
+-                from: 1
+-                to: 0
+-                duration: root.Tokens.anim.durations.expressiveFastEffects
+-                easing: root.Tokens.anim.expressiveFastEffects
+-            }
+-            NumberAnimation {
+-                property: "scale"
+-                from: 1
+-                to: 0.92
+-                duration: root.Tokens.anim.durations.expressiveFastEffects
+-                easing: root.Tokens.anim.expressiveFastEffects
+-            }
+-        }
+-
++        maxMessageWidth: Math.max(240, root.width - root.padding * 4)
++        onConfirmed: command => root.triggerSessionCommand(command)
+         onClosed: {
+             if (root.visibilities.launcher)
+                 search.forceActiveFocus();
+         }
+-
+-        contentItem: ColumnLayout {
+-            spacing: root.Tokens.spacing.medium
+-
+-            StyledText {
+-                Layout.fillWidth: true
+-                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
+-                text: sessionConfirmPopup.confirmTitle
+-                font: root.Tokens.font.body.builders.large.weight(Font.Medium).build()
+-            }
+-
+-            StyledText {
+-                Layout.fillWidth: true
+-                Layout.maximumWidth: Math.max(240, root.width - root.padding * 4)
+-                text: sessionConfirmPopup.confirmMessage
+-                color: Colours.palette.m3onSurfaceVariant
+-                font: root.Tokens.font.body.small
+-                wrapMode: Text.Wrap
+-            }
+-
+-            RowLayout {
+-                Layout.alignment: Qt.AlignRight
+-                spacing: root.Tokens.spacing.small
+-
+-                TextButton {
+-                    text: qsTr("Cancel")
+-                    onClicked: sessionConfirmPopup.close()
+-                }
+-
+-                TextButton {
+-                    text: sessionConfirmPopup.confirmText
+-                    type: TextButton.Filled
+-                    inactiveColour: sessionConfirmPopup.destructive ? Colours.palette.m3error : Colours.palette.m3primary
+-                    inactiveOnColour: sessionConfirmPopup.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
+-                    onClicked: {
+-                        const cmd = sessionConfirmPopup.pendingCommand;
+-                        sessionConfirmPopup.close();
+-                        root.triggerSessionCommand(cmd);
+-                    }
+-                }
+-            }
+-        }
+-
+-        background: Item {
+-            Elevation {
+-                anchors.fill: sessionBgRect
+-                level: 3
+-                radius: sessionBgRect.radius
+-            }
+-
+-            StyledRect {
+-                id: sessionBgRect
+-
+-                anchors.fill: parent
+-                radius: root.Tokens.rounding.large
+-                color: Colours.palette.m3surfaceContainerHigh
+-                border.width: 1
+-                border.color: Colours.palette.m3outlineVariant
+-            }
+-        }
+     }
+ }
+diff --git a/shell/modules/session/Content.qml b/shell/modules/session/Content.qml
+index 5f9ca953..d3a5cb85 100644
+--- a/shell/modules/session/Content.qml
++++ b/shell/modules/session/Content.qml
+@@ -153,123 +153,18 @@ Column {
+         KeyNavigation.up: SessionOptions.showHibernate ? hibernate : sleep
+     }
+ 
+-    Popup {
++    SessionConfirmPopup {
+         id: sessionConfirmPopup
+ 
+-        property string confirmTitle
+-        property string confirmMessage
+-        property string confirmText
+-        property bool destructive
+-        property list<string> pendingCommand: []
+         property Item returnFocusTarget: null
+ 
++        tokens: root.Tokens
+         parent: Overlay.overlay
+-        modal: true
+-        focus: true
+-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+-
+-        x: parent ? Math.round((parent.width - width) / 2) : 0
+-        y: parent ? Math.round((parent.height - height) / 2) : 0
+-        padding: root.Tokens.padding.large
+-
+-        enter: Transition {
+-            NumberAnimation {
+-                property: "opacity"
+-                from: 0
+-                to: 1
+-                duration: root.Tokens.anim.durations.expressiveDefaultEffects
+-                easing: root.Tokens.anim.expressiveDefaultEffects
+-            }
+-            NumberAnimation {
+-                property: "scale"
+-                from: 0.88
+-                to: 1
+-                duration: root.Tokens.anim.durations.expressiveFastSpatial
+-                easing: root.Tokens.anim.expressiveFastSpatial
+-            }
+-        }
+-
+-        exit: Transition {
+-            NumberAnimation {
+-                property: "opacity"
+-                from: 1
+-                to: 0
+-                duration: root.Tokens.anim.durations.expressiveFastEffects
+-                easing: root.Tokens.anim.expressiveFastEffects
+-            }
+-            NumberAnimation {
+-                property: "scale"
+-                from: 1
+-                to: 0.92
+-                duration: root.Tokens.anim.durations.expressiveFastEffects
+-                easing: root.Tokens.anim.expressiveFastEffects
+-            }
+-        }
+-
++        onConfirmed: command => root.runCommand(command)
+         onClosed: {
+             if (root.visibilities.session)
+                 (returnFocusTarget && returnFocusTarget.visible ? returnFocusTarget : logout).forceActiveFocus();
+         }
+-
+-        contentItem: ColumnLayout {
+-            spacing: root.Tokens.spacing.medium
+-
+-            StyledText {
+-                Layout.fillWidth: true
+-                Layout.maximumWidth: 320
+-                text: sessionConfirmPopup.confirmTitle
+-                font: root.Tokens.font.body.builders.large.weight(Font.Medium).build()
+-            }
+-
+-            StyledText {
+-                Layout.fillWidth: true
+-                Layout.maximumWidth: 320
+-                text: sessionConfirmPopup.confirmMessage
+-                color: Colours.palette.m3onSurfaceVariant
+-                font: root.Tokens.font.body.small
+-                wrapMode: Text.Wrap
+-            }
+-
+-            RowLayout {
+-                Layout.alignment: Qt.AlignRight
+-                spacing: root.Tokens.spacing.small
+-
+-                TextButton {
+-                    text: qsTr("Cancel")
+-                    onClicked: sessionConfirmPopup.close()
+-                }
+-
+-                TextButton {
+-                    text: sessionConfirmPopup.confirmText
+-                    type: TextButton.Filled
+-                    inactiveColour: sessionConfirmPopup.destructive ? Colours.palette.m3error : Colours.palette.m3primary
+-                    inactiveOnColour: sessionConfirmPopup.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
+-                    onClicked: {
+-                        const cmd = sessionConfirmPopup.pendingCommand;
+-                        sessionConfirmPopup.close();
+-                        root.runCommand(cmd);
+-                    }
+-                }
+-            }
+-        }
+-
+-        background: Item {
+-            Elevation {
+-                anchors.fill: sessionBgRect
+-                level: 3
+-                radius: sessionBgRect.radius
+-            }
+-
+-            StyledRect {
+-                id: sessionBgRect
+-
+-                anchors.fill: parent
+-                radius: root.Tokens.rounding.large
+-                color: Colours.palette.m3surfaceContainerHigh
+-                border.width: 1
+-                border.color: Colours.palette.m3outlineVariant
+-            }
+-        }
+     }
+ 
+     component SessionButton: ButtonBase {
+-- 
+2.56.1
+

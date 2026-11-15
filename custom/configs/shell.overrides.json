@@ -4,7 +4,7 @@
     },
     "bar": {
         "dock": {
-            "iconSize": 40
+            "iconSize": 48
         },
         "greeter": {
             "afternoonGif": "root:/assets/bongocat.gif",

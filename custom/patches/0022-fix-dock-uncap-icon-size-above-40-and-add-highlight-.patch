@@ -1,0 +1,172 @@
+From bd25373265162a9859afb14f7def36159a402084 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 03:19:59 +0700
+Subject: [PATCH] fix(dock): uncap icon size above 40 and add highlight padding
+
+---
+ shell/modules/bar/BarWidgets.qml              | 25 ++++++++++++++++++
+ shell/modules/bar/BarWrapper.qml              |  4 ++-
+ shell/modules/bar/components/Dock.qml         | 26 +++++++++----------
+ .../nexus/pages/panels/taskbar/BarDock.qml    |  2 +-
+ 4 files changed, 42 insertions(+), 15 deletions(-)
+
+diff --git a/shell/modules/bar/BarWidgets.qml b/shell/modules/bar/BarWidgets.qml
+index d2871a12..2b0fafc1 100644
+--- a/shell/modules/bar/BarWidgets.qml
++++ b/shell/modules/bar/BarWidgets.qml
+@@ -124,6 +124,31 @@ QtObject {
+         node.resetOption("entries");
+     }
+ 
++    function dockIconSize(configuredSize: real): int {
++        const raw = configuredSize > 0 ? configuredSize : 32;
++        return Math.max(16, Math.round(raw / 2) * 2);
++    }
++
++    function dockItemSize(iconSize: real): int {
++        // Leave enough margin around the icon so the highlight tile never
++        // cramps full-bleed squircle icons or the bottom running indicator.
++        const pad = Math.max(6, Math.round(iconSize * 0.16));
++        return Math.round(iconSize + pad * 2);
++    }
++
++    function dockContainerThickness(baseThickness: real, itemSize: real, crossPadding: real): int {
++        // Keep cross-axis padding inside the dock pill around each highlight
++        // tile so the highlight never sits flush against the pill edge.
++        return Math.max(Math.round(baseThickness), Math.round(itemSize + crossPadding * 2));
++    }
++
++    function dockThicknessFor(barConfig: var, baseThickness: real, crossPadding: real): int {
++        if (!isEnabled(barConfig, "dock"))
++            return 0;
++        const iconSize = dockIconSize(barConfig.dock?.iconSize ?? 32);
++        return dockContainerThickness(baseThickness, dockItemSize(iconSize), crossPadding);
++    }
++
+     function indexFor(entries: var, id: string): int {
+         const target = root.widget(id);
+         if (target === null)
+diff --git a/shell/modules/bar/BarWrapper.qml b/shell/modules/bar/BarWrapper.qml
+index 9f549fb0..56e9a9f1 100755
+--- a/shell/modules/bar/BarWrapper.qml
++++ b/shell/modules/bar/BarWrapper.qml
+@@ -23,7 +23,9 @@ Item {
+     readonly property string position: Config.bar.position
+     readonly property real barScale: Math.max(0.6, !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0)
+     readonly property int padding: Math.max(Tokens.padding.small, Config.border.thickness)
+-    readonly property int contentWidth: Math.round(Tokens.sizes.bar.innerWidth * barScale) + padding * 2
++    readonly property int baseInnerThickness: Math.round(Tokens.sizes.bar.innerWidth * barScale)
++    readonly property int dockThickness: BarWidgets.dockThicknessFor(Config.bar, baseInnerThickness, Tokens.padding.extraSmall)
++    readonly property int contentWidth: Math.max(baseInnerThickness, dockThickness) + padding * 2
+     readonly property bool dodgeEnabled: Config.bar.dodgeWindows && Config.bar.persistent && !disabled
+     // The strip the bar occupies, in the absolute multi-monitor coordinates
+     // KWin reports window geometry in — hence the screen origin offset.
+diff --git a/shell/modules/bar/components/Dock.qml b/shell/modules/bar/components/Dock.qml
+index 60916b80..63230ad9 100644
+--- a/shell/modules/bar/components/Dock.qml
++++ b/shell/modules/bar/components/Dock.qml
+@@ -15,6 +15,7 @@ import qs.components.effects
+ import qs.components.images
+ import qs.services
+ import qs.utils
++import qs.modules.bar
+ 
+ Item {
+     id: root
+@@ -27,19 +28,18 @@ Item {
+ 
+     property bool isDragging: false
+ 
+-    property real spacing: Tokens.spacing.small
++    property real spacing: Tokens.spacing.extraSmall
+ 
+-    property real padding: Tokens.padding.medium
++    property real padding: Math.max(Tokens.padding.medium, Math.round(configuredItemSize * 0.22))
+ 
+     readonly property real rawScale: !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0
+     readonly property real scaleFactor: rawScale < 1.0 ? Math.sqrt(Math.max(0.1, rawScale)) : rawScale
+     readonly property int barThickness: Math.round(Tokens.sizes.bar.innerWidth * scaleFactor)
+     readonly property int baseThickness: Tokens.sizes.bar.innerWidth
+     readonly property int effectiveThickness: rawScale < 1.0 ? baseThickness : barThickness
+-    readonly property real configuredItemSize: Math.max(16, Math.min(effectiveThickness, Config.bar.dock.iconSize || 32))
+-    // Icon size of a dock item. Derived from the configured item size rather than the
+-    // delegate's laid-out width, which is still 0 while the delegate is being created.
+-    readonly property real iconSize: Math.max(16, Math.min(configuredItemSize - 4, Math.round(configuredItemSize * 0.88 / 2) * 2))
++    readonly property real iconSize: BarWidgets.dockIconSize(Config.bar.dock.iconSize)
++    readonly property real configuredItemSize: BarWidgets.dockItemSize(iconSize)
++    readonly property int containerThickness: BarWidgets.dockContainerThickness(effectiveThickness, configuredItemSize, Tokens.padding.extraSmall)
+ 
+     implicitWidth: bar.isHorizontal ? container.width : container.implicitWidth
+     implicitHeight: bar.isHorizontal ? container.implicitHeight : container.height
+@@ -287,8 +287,8 @@ Item {
+ 
+         property real __computedContentWidth: __itemCount > 0 ? __itemCount * itemSize + (__itemCount - 1) * root.spacing : 0
+ 
+-        implicitWidth: bar.isHorizontal ? (__computedContentWidth + padding * 2) : bar.thickness
+-        implicitHeight: bar.isHorizontal ? bar.thickness : (__computedContentWidth + padding * 2)
++        implicitWidth: bar.isHorizontal ? (__computedContentWidth + padding * 2) : root.containerThickness
++        implicitHeight: bar.isHorizontal ? root.containerThickness : (__computedContentWidth + padding * 2)
+ 
+         width: bar.isHorizontal ? Math.min(implicitWidth, maxHorizontalSize) : implicitWidth
+         height: !bar.isHorizontal ? Math.min(implicitHeight, maxVerticalSize) : implicitHeight
+@@ -455,7 +455,7 @@ Item {
+                 anchors.left: listView.left
+                 anchors.right: listView.right
+                 anchors.bottom: listView.bottom
+-                anchors.bottomMargin: -root.padding + 2
++                anchors.bottomMargin: -Tokens.padding.extraSmall + 1
+                 visible: bar.isHorizontal && listView.contentWidth > listView.width + 1
+             }
+ 
+@@ -468,7 +468,7 @@ Item {
+                 anchors.top: listView.top
+                 anchors.bottom: listView.bottom
+                 anchors.right: listView.right
+-                anchors.rightMargin: -root.padding + 2
++                anchors.rightMargin: -Tokens.padding.extraSmall + 1
+                 visible: !bar.isHorizontal && listView.contentHeight > listView.height + 1
+             }
+         }
+@@ -652,7 +652,7 @@ Item {
+                         id: icon
+ 
+                         anchors.centerIn: parent
+-                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
++                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -2 : 0
+                         implicitSize: root.iconSize
+                         source: modelData ? WinIcons.sourceFor(modelData.entry, modelData.appClass, modelData.iconName, modelData.pid ?? 0) : ""
+                         visible: !(Config.bar.dock.recolourIcons ?? false)
+@@ -667,7 +667,7 @@ Item {
+ 
+                     ColouredIcon {
+                         anchors.centerIn: parent
+-                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -1 : 0
++                        anchors.verticalCenterOffset: (bar.isHorizontal && delegateItem.hasWindows) ? -2 : 0
+                         implicitSize: root.iconSize
+                         source: icon.source
+                         colour: Colours.palette.m3secondary
+@@ -742,7 +742,7 @@ Item {
+                     ListView {
+                         anchors.bottom: parent.bottom
+                         anchors.horizontalCenter: parent.horizontalCenter
+-                        anchors.bottomMargin: 0
++                        anchors.bottomMargin: 2
+                         spacing: 2
+                         orientation: ListView.Horizontal
+                         interactive: false
+diff --git a/shell/modules/nexus/pages/panels/taskbar/BarDock.qml b/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
+index 3eb8edef..73475ca6 100644
+--- a/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
++++ b/shell/modules/nexus/pages/panels/taskbar/BarDock.qml
+@@ -58,7 +58,7 @@ PageBase {
+             reset: ({ node: GlobalConfig.bar.dock, setting: "iconSize" })
+             value: Config.bar.dock.iconSize
+             from: 20
+-            to: Math.max(20, Math.round(Tokens.sizes.bar.innerWidth * Math.max(1.0, !isNaN(Config.bar.scale) ? Config.bar.scale : 1.0)))
++            to: 64
+             stepSize: 2
+             onMoved: v => GlobalConfig.bar.dock.iconSize = v
+         }
+-- 
+2.56.1
+

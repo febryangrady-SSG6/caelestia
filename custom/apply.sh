@@ -36,6 +36,10 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/launcher/items/AppTile.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/items/CalcItem.qml" \
         "$QS_TARGET/modules/launcher/items/CalcItem.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/BarWidgets.qml" \
+        "$QS_TARGET/modules/bar/BarWidgets.qml"
+    install -Dm755 "$REPO_ROOT/shell/modules/bar/BarWrapper.qml" \
+        "$QS_TARGET/modules/bar/BarWrapper.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/components/Dock.qml" \
         "$QS_TARGET/modules/bar/components/Dock.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/BarComponentContext.qml" \

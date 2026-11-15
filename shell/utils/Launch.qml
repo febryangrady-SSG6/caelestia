@@ -49,8 +49,20 @@ Singleton {
         root.exec(["systemsettings", name]);
     }
 
+    function terminalExecPrefix(baseTerminal: list<string>): list<string> {
+        const term = baseTerminal && baseTerminal.length > 0 ? baseTerminal : GlobalConfig.general.apps.terminal;
+        if (!term || term.length === 0)
+            return [];
+        const arr = Array.from(term);
+        const bin = String(arr[0] || "").split("/").pop();
+        // Konsole requires -e before an inline command rather than bare positional args.
+        if (bin === "konsole" && arr.indexOf("-e") === -1)
+            return [...arr, "-e"];
+        return arr;
+    }
+
     function terminalCommand(command: list<string>): list<string> {
-        return [...GlobalConfig.general.apps.terminal, `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...command];
+        return [...root.terminalExecPrefix([]), `${Quickshell.shellDir}/assets/wrap_term_launch.sh`, ...command];
     }
 
     function launchInTerminal(command: list<string>, workingDirectory: string): void {

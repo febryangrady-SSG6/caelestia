@@ -5,6 +5,7 @@ import Caelestia
 import Caelestia.Config
 import qs.components
 import qs.services
+import qs.utils
 
 Item {
     id: root
@@ -78,7 +79,7 @@ Item {
                 id: stateLayer
 
                 onClicked: {
-                    Quickshell.execDetached([...GlobalConfig.general.apps.terminal, "qalc", "-i", root.math]);
+                    Quickshell.execDetached([...Launch.terminalExecPrefix([]), "qalc", "-i", root.math]);
                     root.list.visibilities.launcher = false;
                 }
 

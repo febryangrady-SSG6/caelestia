@@ -161,6 +161,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `Brightness.qml` unconditionally ran `ddcutil detect` / `ddcutil setvcp 10` on any DDC-capable monitor (`isDdc: ddcInfo !== null`), bypassing KDE's per-output `DDC/CI: disallowed` (`allowDdcCi: false`) and software brightness (`allowSdrSoftwareBrightness: true`) settings and changing physical hardware monitor brightness alongside KWin software brightness.
    - **Fix:** Exposes `hasBrightness(outputName)` and `ddcCiAllowed(outputName)` (plus `hasBrightnessChanged` / `ddcCiAllowedChanged` signals from Wayland `kde_output_device_v2` `capabilities` & `ddc_ci_allowed`) in `BrightnessWatcher`, and updates `Brightness.qml` to delegate brightness solely to KWin (`BrightnessWatcher.setBrightness`) whenever KWin manages brightness or disallows DDC/CI, only falling back to `ddcutil` if KWin does not manage brightness and allows DDC/CI (requires rebuilding `shell/plugin` if applying onto an existing checkout via Option B).
 
+26. **`0026-fix-utilities-keep-DrawerScrim-within-wrapper-bounds.patch`**
+   - **File:** `shell/modules/utilities/DrawerScrim.qml`
+   - **Problem:** `DrawerScrim` extended `-Tokens.padding.large - Config.border.thickness` plus an extra `-parent.height * 0.1` (`~10%` overhang) past the bottom edge, drew two external `ShapePath` corner tails (`-border.smoothing * 2`), and only rounded `topLeftRadius`, causing the darkened modal backdrop (`Delete recording?`, etc.) to spill out below and beyond the rounded Utilities drawer panel.
+   - **Fix:** Sizes `DrawerScrim` to the exact `Utilities.Wrapper` bounds (`-Tokens.padding.large` top/left, `-CUtils.clamp(Tokens.padding.large - Config.border.thickness, 0, Tokens.padding.large)` bottom/right), removes the `-10%` overhang and external `ShapePath` tails, and applies `radius: Surface.panelRounding` cleanly across all corners.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

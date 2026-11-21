@@ -1,0 +1,148 @@
+From dd65c01e59f1956c949aac436116e0b05011110a Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 12:15:38 +0700
+Subject: [PATCH] fix(utilities): keep DrawerScrim within wrapper bounds and
+ rounded corners
+
+---
+ shell/modules/utilities/DrawerScrim.qml | 110 +++---------------------
+ 1 file changed, 13 insertions(+), 97 deletions(-)
+
+diff --git a/shell/modules/utilities/DrawerScrim.qml b/shell/modules/utilities/DrawerScrim.qml
+index 03c41547..7cb641fe 100644
+--- a/shell/modules/utilities/DrawerScrim.qml
++++ b/shell/modules/utilities/DrawerScrim.qml
+@@ -1,117 +1,33 @@
+ pragma ComponentBehavior: Bound
+ 
+ import QtQuick
+-import QtQuick.Shapes
++import Caelestia
+ import Caelestia.Config
+ import qs.components
+ import qs.services
++import qs.utils
+ 
+-/// The dimmed backdrop a utilities-drawer modal sits on. It sizes itself to the
+-/// drawer's surface — over the padding and border the panel clips to, and softened
+-/// on the two edges the drawer animation drags — so a modal only has to declare it
+-/// and put its own card on top. Seeded from the block RecordingDeleteModal grew.
++/// The dimmed backdrop a utilities-drawer modal sits on. Matches the exact
++/// Utilities wrapper bounds (`Wrapper.qml`: `Tokens.padding.large` on top/left,
++/// clamped `padding - border.thickness` on right/bottom) and `Surface.panelRounding`
++/// so the scrim never overflows outside the drawer surface or its rounded corners.
+ Item {
+     id: root
+ 
+     required property matrix4x4 deformMatrix
+ 
++    readonly property real tailPadding: CUtils.clamp(Tokens.padding.large - Config.border.thickness, 0, Tokens.padding.large)
++
+     anchors.fill: parent
+-    anchors.margins: -Tokens.padding.large
+-    anchors.rightMargin: -Tokens.padding.large - Config.border.thickness
+-    anchors.bottomMargin: -Tokens.padding.large - Config.border.thickness
++    anchors.leftMargin: -Tokens.padding.large
++    anchors.topMargin: -Tokens.padding.large
++    anchors.rightMargin: -tailPadding
++    anchors.bottomMargin: -tailPadding
+     opacity: 0.5
+ 
+     StyledRect {
+         anchors.fill: parent
+-        anchors.rightMargin: -parent.width * (1 - root.deformMatrix.m11) / 2
+-        anchors.bottomMargin: -parent.height * 0.1
+-        topLeftRadius: Tokens.rounding.extraLarge
++        radius: Surface.panelRounding
+         color: Colours.palette.m3scrim
+     }
+-
+-    Shape {
+-        id: shape
+-
+-        anchors.fill: parent
+-        preferredRendererType: Shape.CurveRenderer
+-        asynchronous: true
+-
+-        ShapePath {
+-            startX: -root.Config.border.smoothing * 2
+-            startY: shape.height - root.Config.border.thickness
+-            strokeWidth: 0
+-            fillGradient: LinearGradient {
+-                orientation: LinearGradient.Horizontal
+-                x1: -root.Config.border.smoothing * 2
+-
+-                GradientStop {
+-                    position: 0
+-                    color: Qt.alpha(Colours.palette.m3scrim, 0)
+-                }
+-                GradientStop {
+-                    position: 1
+-                    color: Colours.palette.m3scrim
+-                }
+-            }
+-
+-            PathLine {
+-                relativeX: root.Config.border.smoothing
+-                relativeY: 0
+-            }
+-            PathCubic {
+-                relativeX: root.Config.border.smoothing
+-                relativeY: -root.Config.border.smoothing
+-                relativeControl1X: root.Config.border.smoothing * 0.93
+-                relativeControl1Y: -root.Config.border.smoothing * 0.07
+-                relativeControl2X: root.Config.border.smoothing * 0.93
+-                relativeControl2Y: -root.Config.border.smoothing * 0.07
+-            }
+-            PathLine {
+-                relativeX: 0
+-                relativeY: root.Config.border.smoothing + root.Config.border.thickness
+-            }
+-            PathLine {
+-                relativeX: -root.Config.border.smoothing * 2
+-                relativeY: 0
+-            }
+-        }
+-
+-        ShapePath {
+-            startX: shape.width - root.Config.border.smoothing - root.Config.border.thickness + (1 - root.deformMatrix.m11) * shape.width / 2
+-            strokeWidth: 0
+-            fillGradient: LinearGradient {
+-                orientation: LinearGradient.Vertical
+-                y1: -root.Config.border.smoothing * 2
+-
+-                GradientStop {
+-                    position: 0
+-                    color: Qt.alpha(Colours.palette.m3scrim, 0)
+-                }
+-                GradientStop {
+-                    position: 1
+-                    color: Colours.palette.m3scrim
+-                }
+-            }
+-
+-            PathCubic {
+-                relativeX: root.Config.border.smoothing
+-                relativeY: -root.Config.border.smoothing
+-                relativeControl1X: root.Config.border.smoothing * 0.93
+-                relativeControl1Y: -root.Config.border.smoothing * 0.07
+-                relativeControl2X: root.Config.border.smoothing * 0.93
+-                relativeControl2Y: -root.Config.border.smoothing * 0.07
+-            }
+-            PathLine {
+-                relativeX: 0
+-                relativeY: -root.Config.border.smoothing
+-            }
+-            PathLine {
+-                relativeX: root.Config.border.thickness
+-                relativeY: 0
+-            }
+-            PathLine {
+-                relativeX: 0
+-            }
+-        }
+-    }
+ }
+-- 
+2.56.1
+

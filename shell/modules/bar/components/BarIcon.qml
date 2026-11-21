@@ -36,6 +36,9 @@ Item {
     // reason to keep its name back. The box shows that name itself: a tooltip is a window,
     // and one opened over a box this small takes the hover away from the icon under it.
     property bool insidePopout: false
+    // Icons that handle mouse-wheel input directly (e.g. volume/microphone) opt in here;
+    // others leave wheel events unaccepted so the bar's default scroll actions still run.
+    property bool acceptsWheel: false
 
     readonly property bool isHorizontal: Config.bar.position === "top" || Config.bar.position === "bottom"
     // The bar thins itself with a curve rather than in step with the number, and the icons
@@ -59,6 +62,7 @@ Item {
     signal activated()
     signal middleActivated()
     signal contextMenuRequested()
+    signal wheelScrolled(angleDelta: point)
 
     // The menu a widget opens sits above the icon it belongs to.
     function openPopout(name: string): void {
@@ -131,6 +135,15 @@ Item {
                 root.contextMenuRequested();
             else
                 root.activated();
+        }
+
+        onWheel: wheel => {
+            if (!root.acceptsWheel) {
+                wheel.accepted = false;
+                return;
+            }
+            wheel.accepted = true;
+            root.wheelScrolled(wheel.angleDelta);
         }
     }
 

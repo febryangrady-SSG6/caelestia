@@ -85,6 +85,22 @@ BarIcon {
 
     onContextMenuRequested: root.openPopout("statusiconscontext")
 
+    acceptsWheel: root.iconId === "audio" || root.iconId === "microphone"
+
+    onWheelScrolled: angleDelta => {
+        if (root.iconId === "audio") {
+            if (angleDelta.y > 0)
+                Audio.incrementVolume();
+            else if (angleDelta.y < 0)
+                Audio.decrementVolume();
+        } else if (root.iconId === "microphone") {
+            if (angleDelta.y > 0)
+                Audio.incrementSourceVolume();
+            else if (angleDelta.y < 0)
+                Audio.decrementSourceVolume();
+        }
+    }
+
     glyphComponent: {
         switch (root.iconId) {
         case "lockStatus":

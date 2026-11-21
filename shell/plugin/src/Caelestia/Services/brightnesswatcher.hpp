@@ -31,12 +31,20 @@ public:
 
     bool hasBrightness() const { return m_hasBrightness; }
 
+    bool hasDdcCi() const { return m_hasDdcCi; }
+
+    bool ddcCiAllowed() const { return m_ddcCiAllowed; }
+
+    bool ddcCiAllowedReceived() const { return m_ddcCiAllowedReceived; }
+
     void notifyRemoved();
 
 signals:
     void nameChanged();
     void brightnessChanged();
     void dimmingChanged();
+    void hasBrightnessChanged();
+    void ddcCiAllowedChanged();
     void removed();
 
 protected:
@@ -44,6 +52,7 @@ protected:
     void kde_output_device_v2_brightness(uint32_t brightness) override;
     void kde_output_device_v2_dimming(uint32_t multiplier) override;
     void kde_output_device_v2_capabilities(uint32_t flags) override;
+    void kde_output_device_v2_ddc_ci_allowed(uint32_t allowed) override;
     void kde_output_device_v2_removed() override;
 
 private:
@@ -51,6 +60,9 @@ private:
     uint32_t m_brightness = 0;
     uint32_t m_dimming = 10000;
     bool m_hasBrightness = false;
+    bool m_hasDdcCi = false;
+    bool m_ddcCiAllowed = false;
+    bool m_ddcCiAllowedReceived = false;
 };
 
 class KdeOutputDeviceRegistry : public QObject, public QtWayland::kde_output_device_registry_v2 {
@@ -92,6 +104,8 @@ public:
     explicit BrightnessWatcher(QObject* parent = nullptr);
 
     Q_INVOKABLE qreal brightness(const QString& outputName) const;
+    Q_INVOKABLE bool hasBrightness(const QString& outputName) const;
+    Q_INVOKABLE bool ddcCiAllowed(const QString& outputName) const;
     // Also asserts full dimming, in the same configuration: a brightness request is user
     // activity, and a multiplier KWin left behind must not swallow it (KDE bug 513809).
     Q_INVOKABLE void setBrightness(const QString& outputName, qreal value);
@@ -100,6 +114,8 @@ public:
 signals:
     void brightnessChanged(const QString& outputName, qreal value);
     void dimmingChanged(const QString& outputName, qreal value);
+    void hasBrightnessChanged(const QString& outputName, bool supported);
+    void ddcCiAllowedChanged(const QString& outputName, bool allowed);
 
 private slots:
     void onDeviceAdded(KdeOutputDevice* device);

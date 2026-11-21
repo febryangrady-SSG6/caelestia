@@ -44,10 +44,25 @@ void KdeOutputDevice::kde_output_device_v2_dimming(uint32_t multiplier) {
 }
 
 void KdeOutputDevice::kde_output_device_v2_capabilities(uint32_t flags) {
-    bool has = (flags & capability_brightness);
+    const bool has = (flags & capability_brightness) != 0;
     if (m_hasBrightness != has) {
         m_hasBrightness = has;
+        emit hasBrightnessChanged();
     }
+    const bool hasDdc = (flags & capability_ddc_ci) != 0;
+    if (m_hasDdcCi != hasDdc) {
+        m_hasDdcCi = hasDdc;
+        emit ddcCiAllowedChanged();
+    }
+}
+
+void KdeOutputDevice::kde_output_device_v2_ddc_ci_allowed(uint32_t allowed) {
+    const bool isAllowed = (allowed != 0);
+    const bool changed = !m_ddcCiAllowedReceived || m_ddcCiAllowed != isAllowed;
+    m_ddcCiAllowedReceived = true;
+    m_ddcCiAllowed = isAllowed;
+    if (changed)
+        emit ddcCiAllowedChanged();
 }
 
 void KdeOutputDevice::kde_output_device_v2_removed() {
@@ -129,6 +144,20 @@ qreal BrightnessWatcher::brightness(const QString& outputName) const {
     return dev && dev->hasBrightness() ? dev->brightness() / 10000.0 : -1.0;
 }
 
+bool BrightnessWatcher::hasBrightness(const QString& outputName) const {
+    auto* dev = m_devices.value(outputName);
+    return dev && dev->hasBrightness();
+}
+
+bool BrightnessWatcher::ddcCiAllowed(const QString& outputName) const {
+    auto* dev = m_devices.value(outputName);
+    if (!dev)
+        return false;
+    if (dev->hasDdcCi() || dev->ddcCiAllowedReceived())
+        return dev->ddcCiAllowed();
+    return !dev->hasBrightness();
+}
+
 void BrightnessWatcher::setBrightness(const QString& outputName, qreal value) {
     if (!m_management->isInitialized()) {
         qCWarning(lcBrightnessWatcher) << "Cannot set brightness: kde_output_management_v2 is not available.";
@@ -172,15 +201,33 @@ qreal BrightnessWatcher::dimming(const QString& outputName) const {
 void BrightnessWatcher::onDeviceAdded(KdeOutputDevice* device) {
     connect(device, &KdeOutputDevice::nameChanged, this, [this, device]() {
         if (!device->name().isEmpty()) {
+            const bool isNew = m_devices.value(device->name()) != device;
             m_devices[device->name()] = device;
 
-            connect(device, &KdeOutputDevice::brightnessChanged, this, [this, device]() {
-                emit brightnessChanged(device->name(), device->brightness() / 10000.0);
-            });
+            if (isNew) {
+                connect(device, &KdeOutputDevice::brightnessChanged, this, [this, device]() {
+                    emit brightnessChanged(device->name(), device->brightness() / 10000.0);
+                });
 
-            connect(device, &KdeOutputDevice::dimmingChanged, this, [this, device]() {
-                emit dimmingChanged(device->name(), device->dimming() / 10000.0);
-            });
+                connect(device, &KdeOutputDevice::dimmingChanged, this, [this, device]() {
+                    emit dimmingChanged(device->name(), device->dimming() / 10000.0);
+                });
+
+                connect(device, &KdeOutputDevice::hasBrightnessChanged, this, [this, device]() {
+                    emit hasBrightnessChanged(device->name(), device->hasBrightness());
+                    if (device->hasBrightness())
+                        emit brightnessChanged(device->name(), device->brightness() / 10000.0);
+                });
+
+                connect(device, &KdeOutputDevice::ddcCiAllowedChanged, this, [this, device]() {
+                    emit ddcCiAllowedChanged(device->name(), ddcCiAllowed(device->name()));
+                });
+            }
+
+            emit hasBrightnessChanged(device->name(), device->hasBrightness());
+            emit ddcCiAllowedChanged(device->name(), ddcCiAllowed(device->name()));
+            if (device->hasBrightness())
+                emit brightnessChanged(device->name(), device->brightness() / 10000.0);
         }
     });
 

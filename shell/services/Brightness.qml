@@ -66,9 +66,26 @@ Singleton {
         getMonitor("active")?.stepBrightness(-GlobalConfig.services.brightnessIncrement);
     }
 
+    function scheduleDdcProbe(): void {
+        if (root.monitors.some(m => !m.kwinManagesBrightness && m.ddcCiAllowed))
+            ddcProbeTimer.restart();
+    }
+
     onMonitorsChanged: {
         ddcMonitors = [];
-        ddcProc.running = true;
+        scheduleDdcProbe();
+    }
+
+    Timer {
+        id: ddcProbeTimer
+
+        interval: 250
+        onTriggered: {
+            if (root.monitors.some(m => !m.kwinManagesBrightness && m.ddcCiAllowed)) {
+                ddcProc.running = false;
+                ddcProc.running = true;
+            }
+        }
     }
 
     Variants {
@@ -116,6 +133,27 @@ Singleton {
             if (monitor && monitor.dimming !== value) {
                 monitor.dimming = value;
             }
+        }
+
+        function onHasBrightnessChanged(outputName: string, supported: bool): void {
+            const monitor = root.getMonitor(outputName);
+            if (!monitor)
+                return;
+            monitor.kwinManagesBrightness = supported;
+            if (supported)
+                monitor.initBrightness();
+            else
+                root.scheduleDdcProbe();
+        }
+
+        function onDdcCiAllowedChanged(outputName: string, allowed: bool): void {
+            const monitor = root.getMonitor(outputName);
+            if (!monitor)
+                return;
+            monitor.ddcCiAllowed = allowed;
+            monitor.initBrightness();
+            if (allowed && !monitor.kwinManagesBrightness)
+                root.scheduleDdcProbe();
         }
     }
 
@@ -208,8 +246,10 @@ Singleton {
         id: monitor
 
         required property ShellScreen modelData
+        property bool kwinManagesBrightness: BrightnessWatcher.hasBrightness(modelData.name)
+        property bool ddcCiAllowed: BrightnessWatcher.ddcCiAllowed(modelData.name)
         readonly property var ddcInfo: root.ddcMonitorMap[modelData.name] ?? null
-        readonly property bool isDdc: ddcInfo !== null
+        readonly property bool isDdc: ddcInfo !== null && !kwinManagesBrightness && ddcCiAllowed
         readonly property string busNum: ddcInfo?.busNum ?? ""
         readonly property bool isAppleDisplay: root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
         readonly property bool writesHardwareDirectly: isAppleDisplay || isDdc
@@ -380,6 +420,14 @@ Singleton {
         }
 
         onBusNumChanged: initBrightness()
+        onIsDdcChanged: {
+            if (!isDdc) {
+                timer.stop();
+                queuedBrightness = NaN;
+                verifying = false;
+            }
+            initBrightness();
+        }
         Component.onCompleted: initBrightness()
     }
 }

@@ -853,6 +853,10 @@ def cmd_kde_selection(scheme_file: str, colors_file: str) -> int:
             elif key == "ForegroundInactive" and (len(val_hex) != 6 or contrast_ratio(primary, val_hex) < 4.5):
                 lines[index] = f"ForegroundInactive=#{sel_inactive}"
                 changed = True
+        elif section == "[Colors:View]" and len(primary) == 6 and sel_fg and key in ("DecorationFocus", "DecorationHover"):
+            if len(val_hex) != 6 or contrast_ratio(val_hex, sel_fg) < 4.5:
+                lines[index] = f"{key}=#{primary}"
+                changed = True
         elif section == "[Colors:Complementary]" and comp_fg and key == "ForegroundNormal":
             if len(val_hex) != 6 or contrast_ratio(surface, val_hex) < 4.5:
                 lines[index] = f"ForegroundNormal=#{comp_fg}"

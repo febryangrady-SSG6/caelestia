@@ -252,6 +252,35 @@ QtObject {
         notification.sendInlineReply(trimmed);
     }
 
+    function invokeAction(action: var): void {
+        if (!action)
+            return;
+
+        if (appName === "Caelestia Updates") {
+            const actionId = String(action.identifier ?? "");
+            if (actionId === "close") {
+                close();
+                return;
+            }
+            if (actionId === "run") {
+                const isUiUpdate = summary.includes("Caelestia") || summary.includes("UI") || bodyPlain.includes("commits");
+                if (isUiUpdate) {
+                    Quickshell.execDetached(["qs", "-c", "caelestia", "ipc", "call", "nexus", "openPage", "updates", "-1"]);
+                } else {
+                    const cmd = 'if command -v yay >/dev/null 2>&1; then yay -Syu; elif command -v pacman >/dev/null 2>&1; then sudo pacman -Syu; fi; s=$?; if command -v flatpak >/dev/null 2>&1; then flatpak update; fi; printf "\\n[system update exited with status %s] Press Enter to close..." "$s"; read -r _';
+                    Launch.exec([...Launch.terminalExecPrefix([]), "sh", "-c", cmd]);
+                }
+                close();
+                return;
+            }
+        }
+
+        if (typeof action.invoke === "function")
+            action.invoke();
+        else if (!resident)
+            close();
+    }
+
     function lock(item: Item): void {
         locks.add(item);
     }

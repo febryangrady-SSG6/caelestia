@@ -85,7 +85,7 @@ StyledRect {
 
             const actions = root.modelData.actions;
             if (actions.length === 1)
-                actions[0].invoke();
+                root.modelData.invokeAction(actions[0]);
         }
 
         Item {
@@ -468,7 +468,7 @@ StyledRect {
                         inactiveColour: root.modelData.urgency === NotificationUrgency.Critical ? Colours.palette.m3secondary : Colours.layer(Colours.palette.m3surfaceContainerHighest, 2)
                         inactiveOnColour: root.modelData.urgency === NotificationUrgency.Critical ? Colours.palette.m3onSecondary : Colours.palette.m3onSurfaceVariant
                         text: modelData.text
-                        onClicked: modelData.invoke()
+                        onClicked: root.modelData.invokeAction(modelData)
 
                         label.horizontalAlignment: Text.AlignHCenter
                         label.anchors.left: left

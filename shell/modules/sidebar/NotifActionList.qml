@@ -143,10 +143,8 @@ Item {
                                 Quickshell.clipboardText = root.notif.body;
                                 actionInner.item.text = "inventory";
                                 copyTimer.start();
-                            } else if (action.modelData.invoke) {
-                                action.modelData.invoke();
-                            } else if (!root.notif.resident) {
-                                root.notif.close();
+                            } else {
+                                root.notif.invokeAction(action.modelData);
                             }
                         }
                     }

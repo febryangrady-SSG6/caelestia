@@ -64,8 +64,14 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/nexus/pages/panels/taskbar/BarDock.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/session/Content.qml" \
         "$QS_TARGET/modules/session/Content.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/notifications/Notification.qml" \
+        "$QS_TARGET/modules/notifications/Notification.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/sidebar/NotifActionList.qml" \
+        "$QS_TARGET/modules/sidebar/NotifActionList.qml"
     install -Dm644 "$REPO_ROOT/shell/services/Brightness.qml" \
         "$QS_TARGET/services/Brightness.qml"
+    install -Dm644 "$REPO_ROOT/shell/services/NotifData.qml" \
+        "$QS_TARGET/services/NotifData.qml"
     install -Dm644 "$REPO_ROOT/shell/services/SessionOptions.qml" \
         "$QS_TARGET/services/SessionOptions.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/sidebar/AiAssistant.qml" \
@@ -88,6 +94,12 @@ if [[ -d "$PLASMA_LOCKSCREEN_DIR" ]]; then
         "$PLASMA_LOCKSCREEN"
     install -Dm644 "$REPO_ROOT/src/kde/shells/caelestia.desktop/contents/lockscreen/components/NotifDock.qml" \
         "$PLASMA_LOCKSCREEN_DIR/components/NotifDock.qml"
+fi
+
+CAELESTIA_CHECK_UPDATES_BIN="$HOME/.local/bin/caelestia-check-updates"
+if [[ -f "$REPO_ROOT/src/bin/caelestia-check-updates" ]]; then
+    log "Syncing patched caelestia-check-updates to $CAELESTIA_CHECK_UPDATES_BIN"
+    install -Dm755 "$REPO_ROOT/src/bin/caelestia-check-updates" "$CAELESTIA_CHECK_UPDATES_BIN"
 fi
 
 CAELESTIA_COLOR_BIN="$HOME/.local/bin/caelestia-color"

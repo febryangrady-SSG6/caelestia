@@ -166,6 +166,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** `DrawerScrim` extended `-Tokens.padding.large - Config.border.thickness` plus an extra `-parent.height * 0.1` (`~10%` overhang) past the bottom edge, drew two external `ShapePath` corner tails (`-border.smoothing * 2`), and only rounded `topLeftRadius`, causing the darkened modal backdrop (`Delete recording?`, etc.) to spill out below and beyond the rounded Utilities drawer panel.
    - **Fix:** Sizes `DrawerScrim` to the exact `Utilities.Wrapper` bounds (`-Tokens.padding.large` top/left, `-CUtils.clamp(Tokens.padding.large - Config.border.thickness, 0, Tokens.padding.large)` bottom/right), removes the `-10%` overhang and external `ShapePath` tails, and applies `radius: Surface.panelRounding` cleanly across all corners.
 
+27. **`0027-fix-updates-make-update-notification-Install-Updates.patch`**
+   - **Files:** `src/bin/caelestia-check-updates`, `shell/services/NotifData.qml`, `shell/modules/notifications/Notification.qml`, `shell/modules/sidebar/NotifActionList.qml`
+   - **Problem:** Clicking **Install Updates** on `Caelestia Updates` notifications did nothing: `caelestia-check-updates` used `notify-send -w -t 300000` (dying after 5 minutes / across restarts so persisted notifications had no `invoke` callback), called nonexistent `caelestia shell toggleNexus`, left `$REPO` undefined, and opened Nexus Updates (which hides Install Update when only system packages are pending).
+   - **Fix:** Adds `NotifData.invokeAction(action)` (shared by `Notification.qml` and `NotifActionList.qml`) so `Caelestia Updates` **Install Updates** / **Close** actions work even on expired or persisted notifications — launching the system package updater (`yay -Syu` / `sudo pacman -Syu` / `flatpak update`) in the configured terminal for `System Update Available`, or opening Nexus Updates (`nexus openPage updates -1`) for Caelestia UI updates — and fixes `$REPO` + the fallback handler in `src/bin/caelestia-check-updates`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

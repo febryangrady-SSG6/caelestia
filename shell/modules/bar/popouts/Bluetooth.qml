@@ -148,8 +148,10 @@ ColumnLayout {
                         Item {
                             id: connectBtn
 
-                            Layout.preferredWidth: Tokens.font.icon.medium.pointSize * root.scaleOffset
-                            Layout.preferredHeight: width
+                            implicitWidth: Math.max(connectIcon.implicitWidth, Tokens.font.icon.medium.pointSize * root.scaleOffset)
+                            implicitHeight: Math.max(connectIcon.implicitHeight, Tokens.font.icon.medium.pointSize * root.scaleOffset)
+                            Layout.preferredWidth: implicitWidth
+                            Layout.preferredHeight: implicitHeight
                             visible: device.modelData.state === BluetoothDeviceState.Connected || device.loading
 
                             CircularIndicator {
@@ -158,6 +160,8 @@ ColumnLayout {
                             }
 
                             MaterialIcon {
+                                id: connectIcon
+
                                 anchors.centerIn: parent
                                 animate: true
                                 text: device.modelData.state === BluetoothDeviceState.Connected ? "link_off" : "link"
@@ -172,8 +176,8 @@ ColumnLayout {
                             asynchronous: true
                             active: device.modelData.bonded
                             sourceComponent: Item {
-                                implicitWidth: connectBtn.implicitWidth
-                                implicitHeight: connectBtn.implicitHeight
+                                implicitWidth: Math.max(deleteIcon.implicitWidth, connectBtn.implicitWidth)
+                                implicitHeight: Math.max(deleteIcon.implicitHeight, connectBtn.implicitHeight)
 
                                 StateLayer {
                                     radius: Tokens.rounding.full * root.scaleOffset
@@ -181,6 +185,8 @@ ColumnLayout {
                                 }
 
                                 MaterialIcon {
+                                    id: deleteIcon
+
                                     anchors.centerIn: parent
                                     text: "delete"
                                     fontStyle.pointSize: Tokens.font.icon.medium.pointSize * root.fontScale

@@ -76,6 +76,7 @@ Item {
     readonly property var activePasswordPill: isPortrait ? portraitPasswordPill : passwordPill
     property string authMessage: ""
     property bool ready: false
+    property int renderedFrames: 0
 
     readonly property string sysinfoScriptPath: {
         var url = Qt.resolvedUrl("scripts/sysinfo.py").toString();
@@ -140,7 +141,7 @@ Item {
     Timer {
         id: readyTimer
 
-        interval: 50
+        interval: 1200
         running: true
         onTriggered: lockScreenUi.ready = true
     }
@@ -169,6 +170,19 @@ Item {
         }
         if (terms.length > 0) lockScreenUi.clTerms = terms;
         lockScreenUi.greetingInfo = lockScreenUi.getGreeting();
+    }
+
+    Connections {
+        target: lockScreenUi.Window.window
+
+        ignoreUnknownSignals: true
+
+        function onFrameSwapped() {
+            if (lockScreenUi.ready)
+                return;
+            if (++lockScreenUi.renderedFrames >= 2)
+                lockScreenUi.ready = true;
+        }
     }
 
     Plasma5Support.DataSource {
@@ -445,17 +459,29 @@ Item {
         id: fullWallpaperBlurOverlay
 
         anchors.fill: parent
-        visible: lockScreenUi.blurWallpaper
-        opacity: visible ? 1 : 0
+        visible: lockScreenUi.blurWallpaper || opacity > 0
+        opacity: lockScreenUi.blurWallpaper || !lockScreenUi.ready ? 1 : 0
+        scale: lockScreenUi.ready ? 1 : 1.04
 
         Behavior on opacity {
-            NumberAnimation { duration: 250 }
+            NumberAnimation { duration: LockScreenConfig.animSlow; easing.type: Easing.OutCubic }
+        }
+
+        Behavior on scale {
+            NumberAnimation { duration: LockScreenConfig.animSlow; easing.type: Easing.OutCubic }
         }
 
         ShaderEffectSource {
             anchors.fill: parent
             sourceItem: wallpaperBlur
             live: true
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: !lockScreenUi.blurWallpaper
+            color: lockScreenUi.clSurface
+            opacity: 0.45
         }
     }
 
@@ -465,6 +491,7 @@ Item {
         anchors.fill: parent
         focus: true
         opacity: lockScreenUi.ready ? 1.0 : 0.0
+        scale: lockScreenUi.ready ? 1.0 : 0.98
 
         Keys.onPressed: event => {
             authHandler.ensureAuthenticating();
@@ -480,6 +507,10 @@ Item {
 
         Behavior on opacity {
             NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
+        }
+
+        Behavior on scale {
+            NumberAnimation { duration: LockScreenConfig.animSlow; easing.type: Easing.OutCubic }
         }
 
         MouseArea {

@@ -195,10 +195,17 @@ StyledRect {
                 Layout.fillWidth: true
                 spacing: Tokens.spacing.small
 
+                TextMetrics {
+                    id: digitsPlaceholderMetrics
+
+                    font: digitsField.font
+                    text: digitsField.placeholderText
+                }
+
                 StyledTextField {
                     id: digitsField
 
-                    Layout.preferredWidth: 96
+                    Layout.preferredWidth: Math.max(96, Math.ceil(digitsPlaceholderMetrics.width) + leftPadding + rightPadding)
                     horizontalAlignment: TextInput.AlignHCenter
                     placeholderText: qsTr("300 = 3:00")
                     onAccepted: root.beginTyped()

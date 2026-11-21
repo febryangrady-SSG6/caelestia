@@ -78,6 +78,7 @@ Item {
         popouts.currentName = name;
         popouts.currentCenter = root.isHorizontal ? root.mapToItem(null, root.width / 2, 0).x : root.mapToItem(null, 0, root.height / 2).y;
         popouts.hasCurrent = true;
+        popouts.staysOpen = true;
     }
 
     implicitWidth: root.isHorizontal ? Math.round(glyphLoader.implicitWidth) : root.barThickness

@@ -749,8 +749,21 @@ QtObject {
     }
 
     function defaultPageForCategoryKey(key: string): string {
-        const idx = categoryIdxForKey(key);
-        return idx >= 0 ? defaultPageForCategory(idx) : key;
+        for (let i = 0; i < categories.length; i++) {
+            if (categories[i].key === key)
+                return categories[i].defaultPage;
+            const pages = categories[i].pages;
+            for (let j = 0; j < pages.length; j++) {
+                if (pages[j].key === key)
+                    return key;
+                const subs = pages[j].subPages || [];
+                for (let k = 0; k < subs.length; k++) {
+                    if (subs[k].key === key)
+                        return key;
+                }
+            }
+        }
+        return key;
     }
 
     component PlaceholderComp: Item {

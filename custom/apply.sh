@@ -62,6 +62,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/nexus/pages/panels/taskbar/BarDock.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/session/Content.qml" \
         "$QS_TARGET/modules/session/Content.qml"
+    install -Dm644 "$REPO_ROOT/shell/services/Brightness.qml" \
+        "$QS_TARGET/services/Brightness.qml"
     install -Dm644 "$REPO_ROOT/shell/services/SessionOptions.qml" \
         "$QS_TARGET/services/SessionOptions.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/sidebar/AiAssistant.qml" \

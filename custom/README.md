@@ -156,6 +156,11 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** The session action confirmation popup (`Log out?`, `Shut down computer?`, `Hibernate computer?`, `Restart computer?`) neither focused a button on open nor handled arrow/`Tab`/`Enter`/`Space`/`Escape` keys, `Cancel` defaulted to `TextButton.Filled` looking identical to the confirm button, and `TextButton`/`ButtonBase` had no visible keyboard focus ring.
    - **Fix:** Extracts a shared `SessionConfirmPopup` component (`Tonal` **Cancel** focused safely on open + `Filled` confirm button), adds full keyboard navigation (`Left`/`Right`/`Tab`/`Backtab`/`H`/`L` to switch buttons, `Enter`/`Return`/`Space` to activate, `Esc` to dismiss), and renders a 2px `m3onSurface` outer focus ring + radius shift on whichever button currently holds `activeFocus`.
 
+25. **`0025-fix-brightness-delegate-to-KWin-brightness-and-respe.patch`**
+   - **Files:** `shell/plugin/src/Caelestia/Services/brightnesswatcher.hpp`, `shell/plugin/src/Caelestia/Services/brightnesswatcher.cpp`, `shell/services/Brightness.qml`
+   - **Problem:** `Brightness.qml` unconditionally ran `ddcutil detect` / `ddcutil setvcp 10` on any DDC-capable monitor (`isDdc: ddcInfo !== null`), bypassing KDE's per-output `DDC/CI: disallowed` (`allowDdcCi: false`) and software brightness (`allowSdrSoftwareBrightness: true`) settings and changing physical hardware monitor brightness alongside KWin software brightness.
+   - **Fix:** Exposes `hasBrightness(outputName)` and `ddcCiAllowed(outputName)` (plus `hasBrightnessChanged` / `ddcCiAllowedChanged` signals from Wayland `kde_output_device_v2` `capabilities` & `ddc_ci_allowed`) in `BrightnessWatcher`, and updates `Brightness.qml` to delegate brightness solely to KWin (`BrightnessWatcher.setBrightness`) whenever KWin manages brightness or disallows DDC/CI, only falling back to `ddcutil` if KWin does not manage brightness and allows DDC/CI (requires rebuilding `shell/plugin` if applying onto an existing checkout via Option B).
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

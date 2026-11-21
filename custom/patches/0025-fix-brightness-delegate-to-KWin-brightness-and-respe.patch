@@ -1,0 +1,255 @@
+From 21d3799dad390cfe975d5290bfb8a537c93fa9b5 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 11:34:42 +0700
+Subject: [PATCH] fix(brightness): delegate to KWin brightness and respect KDE
+ DDC/CI setting
+
+---
+ .../Caelestia/Services/brightnesswatcher.cpp  | 61 ++++++++++++++++---
+ .../Caelestia/Services/brightnesswatcher.hpp  | 16 +++++
+ shell/services/Brightness.qml                 | 52 +++++++++++++++-
+ 3 files changed, 120 insertions(+), 9 deletions(-)
+
+diff --git a/shell/plugin/src/Caelestia/Services/brightnesswatcher.cpp b/shell/plugin/src/Caelestia/Services/brightnesswatcher.cpp
+index 7f6c258f..386ef3b2 100644
+--- a/shell/plugin/src/Caelestia/Services/brightnesswatcher.cpp
++++ b/shell/plugin/src/Caelestia/Services/brightnesswatcher.cpp
+@@ -44,10 +44,25 @@ void KdeOutputDevice::kde_output_device_v2_dimming(uint32_t multiplier) {
+ }
+ 
+ void KdeOutputDevice::kde_output_device_v2_capabilities(uint32_t flags) {
+-    bool has = (flags & capability_brightness);
++    const bool has = (flags & capability_brightness) != 0;
+     if (m_hasBrightness != has) {
+         m_hasBrightness = has;
++        emit hasBrightnessChanged();
+     }
++    const bool hasDdc = (flags & capability_ddc_ci) != 0;
++    if (m_hasDdcCi != hasDdc) {
++        m_hasDdcCi = hasDdc;
++        emit ddcCiAllowedChanged();
++    }
++}
++
++void KdeOutputDevice::kde_output_device_v2_ddc_ci_allowed(uint32_t allowed) {
++    const bool isAllowed = (allowed != 0);
++    const bool changed = !m_ddcCiAllowedReceived || m_ddcCiAllowed != isAllowed;
++    m_ddcCiAllowedReceived = true;
++    m_ddcCiAllowed = isAllowed;
++    if (changed)
++        emit ddcCiAllowedChanged();
+ }
+ 
+ void KdeOutputDevice::kde_output_device_v2_removed() {
+@@ -129,6 +144,20 @@ qreal BrightnessWatcher::brightness(const QString& outputName) const {
+     return dev && dev->hasBrightness() ? dev->brightness() / 10000.0 : -1.0;
+ }
+ 
++bool BrightnessWatcher::hasBrightness(const QString& outputName) const {
++    auto* dev = m_devices.value(outputName);
++    return dev && dev->hasBrightness();
++}
++
++bool BrightnessWatcher::ddcCiAllowed(const QString& outputName) const {
++    auto* dev = m_devices.value(outputName);
++    if (!dev)
++        return false;
++    if (dev->hasDdcCi() || dev->ddcCiAllowedReceived())
++        return dev->ddcCiAllowed();
++    return !dev->hasBrightness();
++}
++
+ void BrightnessWatcher::setBrightness(const QString& outputName, qreal value) {
+     if (!m_management->isInitialized()) {
+         qCWarning(lcBrightnessWatcher) << "Cannot set brightness: kde_output_management_v2 is not available.";
+@@ -172,15 +201,33 @@ qreal BrightnessWatcher::dimming(const QString& outputName) const {
+ void BrightnessWatcher::onDeviceAdded(KdeOutputDevice* device) {
+     connect(device, &KdeOutputDevice::nameChanged, this, [this, device]() {
+         if (!device->name().isEmpty()) {
++            const bool isNew = m_devices.value(device->name()) != device;
+             m_devices[device->name()] = device;
+ 
+-            connect(device, &KdeOutputDevice::brightnessChanged, this, [this, device]() {
++            if (isNew) {
++                connect(device, &KdeOutputDevice::brightnessChanged, this, [this, device]() {
++                    emit brightnessChanged(device->name(), device->brightness() / 10000.0);
++                });
++
++                connect(device, &KdeOutputDevice::dimmingChanged, this, [this, device]() {
++                    emit dimmingChanged(device->name(), device->dimming() / 10000.0);
++                });
++
++                connect(device, &KdeOutputDevice::hasBrightnessChanged, this, [this, device]() {
++                    emit hasBrightnessChanged(device->name(), device->hasBrightness());
++                    if (device->hasBrightness())
++                        emit brightnessChanged(device->name(), device->brightness() / 10000.0);
++                });
++
++                connect(device, &KdeOutputDevice::ddcCiAllowedChanged, this, [this, device]() {
++                    emit ddcCiAllowedChanged(device->name(), ddcCiAllowed(device->name()));
++                });
++            }
++
++            emit hasBrightnessChanged(device->name(), device->hasBrightness());
++            emit ddcCiAllowedChanged(device->name(), ddcCiAllowed(device->name()));
++            if (device->hasBrightness())
+                 emit brightnessChanged(device->name(), device->brightness() / 10000.0);
+-            });
+-
+-            connect(device, &KdeOutputDevice::dimmingChanged, this, [this, device]() {
+-                emit dimmingChanged(device->name(), device->dimming() / 10000.0);
+-            });
+         }
+     });
+ 
+diff --git a/shell/plugin/src/Caelestia/Services/brightnesswatcher.hpp b/shell/plugin/src/Caelestia/Services/brightnesswatcher.hpp
+index 471cd298..81ae81de 100644
+--- a/shell/plugin/src/Caelestia/Services/brightnesswatcher.hpp
++++ b/shell/plugin/src/Caelestia/Services/brightnesswatcher.hpp
+@@ -31,12 +31,20 @@ public:
+ 
+     bool hasBrightness() const { return m_hasBrightness; }
+ 
++    bool hasDdcCi() const { return m_hasDdcCi; }
++
++    bool ddcCiAllowed() const { return m_ddcCiAllowed; }
++
++    bool ddcCiAllowedReceived() const { return m_ddcCiAllowedReceived; }
++
+     void notifyRemoved();
+ 
+ signals:
+     void nameChanged();
+     void brightnessChanged();
+     void dimmingChanged();
++    void hasBrightnessChanged();
++    void ddcCiAllowedChanged();
+     void removed();
+ 
+ protected:
+@@ -44,6 +52,7 @@ protected:
+     void kde_output_device_v2_brightness(uint32_t brightness) override;
+     void kde_output_device_v2_dimming(uint32_t multiplier) override;
+     void kde_output_device_v2_capabilities(uint32_t flags) override;
++    void kde_output_device_v2_ddc_ci_allowed(uint32_t allowed) override;
+     void kde_output_device_v2_removed() override;
+ 
+ private:
+@@ -51,6 +60,9 @@ private:
+     uint32_t m_brightness = 0;
+     uint32_t m_dimming = 10000;
+     bool m_hasBrightness = false;
++    bool m_hasDdcCi = false;
++    bool m_ddcCiAllowed = false;
++    bool m_ddcCiAllowedReceived = false;
+ };
+ 
+ class KdeOutputDeviceRegistry : public QObject, public QtWayland::kde_output_device_registry_v2 {
+@@ -92,6 +104,8 @@ public:
+     explicit BrightnessWatcher(QObject* parent = nullptr);
+ 
+     Q_INVOKABLE qreal brightness(const QString& outputName) const;
++    Q_INVOKABLE bool hasBrightness(const QString& outputName) const;
++    Q_INVOKABLE bool ddcCiAllowed(const QString& outputName) const;
+     // Also asserts full dimming, in the same configuration: a brightness request is user
+     // activity, and a multiplier KWin left behind must not swallow it (KDE bug 513809).
+     Q_INVOKABLE void setBrightness(const QString& outputName, qreal value);
+@@ -100,6 +114,8 @@ public:
+ signals:
+     void brightnessChanged(const QString& outputName, qreal value);
+     void dimmingChanged(const QString& outputName, qreal value);
++    void hasBrightnessChanged(const QString& outputName, bool supported);
++    void ddcCiAllowedChanged(const QString& outputName, bool allowed);
+ 
+ private slots:
+     void onDeviceAdded(KdeOutputDevice* device);
+diff --git a/shell/services/Brightness.qml b/shell/services/Brightness.qml
+index 5ae97166..92387c17 100644
+--- a/shell/services/Brightness.qml
++++ b/shell/services/Brightness.qml
+@@ -66,9 +66,26 @@ Singleton {
+         getMonitor("active")?.stepBrightness(-GlobalConfig.services.brightnessIncrement);
+     }
+ 
++    function scheduleDdcProbe(): void {
++        if (root.monitors.some(m => !m.kwinManagesBrightness && m.ddcCiAllowed))
++            ddcProbeTimer.restart();
++    }
++
+     onMonitorsChanged: {
+         ddcMonitors = [];
+-        ddcProc.running = true;
++        scheduleDdcProbe();
++    }
++
++    Timer {
++        id: ddcProbeTimer
++
++        interval: 250
++        onTriggered: {
++            if (root.monitors.some(m => !m.kwinManagesBrightness && m.ddcCiAllowed)) {
++                ddcProc.running = false;
++                ddcProc.running = true;
++            }
++        }
+     }
+ 
+     Variants {
+@@ -117,6 +134,27 @@ Singleton {
+                 monitor.dimming = value;
+             }
+         }
++
++        function onHasBrightnessChanged(outputName: string, supported: bool): void {
++            const monitor = root.getMonitor(outputName);
++            if (!monitor)
++                return;
++            monitor.kwinManagesBrightness = supported;
++            if (supported)
++                monitor.initBrightness();
++            else
++                root.scheduleDdcProbe();
++        }
++
++        function onDdcCiAllowedChanged(outputName: string, allowed: bool): void {
++            const monitor = root.getMonitor(outputName);
++            if (!monitor)
++                return;
++            monitor.ddcCiAllowed = allowed;
++            monitor.initBrightness();
++            if (allowed && !monitor.kwinManagesBrightness)
++                root.scheduleDdcProbe();
++        }
+     }
+ 
+     Connections {
+@@ -208,8 +246,10 @@ Singleton {
+         id: monitor
+ 
+         required property ShellScreen modelData
++        property bool kwinManagesBrightness: BrightnessWatcher.hasBrightness(modelData.name)
++        property bool ddcCiAllowed: BrightnessWatcher.ddcCiAllowed(modelData.name)
+         readonly property var ddcInfo: root.ddcMonitorMap[modelData.name] ?? null
+-        readonly property bool isDdc: ddcInfo !== null
++        readonly property bool isDdc: ddcInfo !== null && !kwinManagesBrightness && ddcCiAllowed
+         readonly property string busNum: ddcInfo?.busNum ?? ""
+         readonly property bool isAppleDisplay: root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
+         readonly property bool writesHardwareDirectly: isAppleDisplay || isDdc
+@@ -380,6 +420,14 @@ Singleton {
+         }
+ 
+         onBusNumChanged: initBrightness()
++        onIsDdcChanged: {
++            if (!isDdc) {
++                timer.stop();
++                queuedBrightness = NaN;
++                verifying = false;
++            }
++            initBrightness();
++        }
+         Component.onCompleted: initBrightness()
+     }
+ }
+-- 
+2.56.1
+

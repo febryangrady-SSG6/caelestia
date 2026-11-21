@@ -32,6 +32,8 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/utilities/DrawerScrim.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/utilities/cards/CaptureCard.qml" \
         "$QS_TARGET/modules/utilities/cards/CaptureCard.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/utilities/cards/TimersCard.qml" \
+        "$QS_TARGET/modules/utilities/cards/TimersCard.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/ContentList.qml" \
         "$QS_TARGET/modules/launcher/ContentList.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/launcher/Content.qml" \
@@ -56,10 +58,14 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/bar/popouts/Bluetooth.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
         "$QS_TARGET/modules/bar/popouts/Greeter.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/TrayOverflow.qml" \
+        "$QS_TARGET/modules/bar/popouts/TrayOverflow.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/drawers/ContentWindow.qml" \
         "$QS_TARGET/modules/drawers/ContentWindow.qml"
     install -Dm644 "$REPO_ROOT/shell/utils/Launch.qml" \
         "$QS_TARGET/utils/Launch.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/nexus/PageCompRegistry.qml" \
+        "$QS_TARGET/modules/nexus/PageCompRegistry.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/PageRowIndex.qml" \
         "$QS_TARGET/modules/nexus/PageRowIndex.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/pages/SessionPage.qml" \

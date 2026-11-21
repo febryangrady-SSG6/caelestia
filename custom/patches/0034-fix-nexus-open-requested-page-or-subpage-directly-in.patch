@@ -1,0 +1,41 @@
+From 741ffcaba6a330e90c59f5adb4d7c0fd6bd74e92 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 22:17:02 +0700
+Subject: [PATCH] fix(nexus): open requested page or subpage directly instead
+ of category default
+
+---
+ shell/modules/nexus/PageCompRegistry.qml | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/shell/modules/nexus/PageCompRegistry.qml b/shell/modules/nexus/PageCompRegistry.qml
+index 423ad288..af5e1157 100644
+--- a/shell/modules/nexus/PageCompRegistry.qml
++++ b/shell/modules/nexus/PageCompRegistry.qml
+@@ -749,8 +749,21 @@ QtObject {
+     }
+ 
+     function defaultPageForCategoryKey(key: string): string {
+-        const idx = categoryIdxForKey(key);
+-        return idx >= 0 ? defaultPageForCategory(idx) : key;
++        for (let i = 0; i < categories.length; i++) {
++            if (categories[i].key === key)
++                return categories[i].defaultPage;
++            const pages = categories[i].pages;
++            for (let j = 0; j < pages.length; j++) {
++                if (pages[j].key === key)
++                    return key;
++                const subs = pages[j].subPages || [];
++                for (let k = 0; k < subs.length; k++) {
++                    if (subs[k].key === key)
++                        return key;
++                }
++            }
++        }
++        return key;
+     }
+ 
+     component PlaceholderComp: Item {
+-- 
+2.56.1
+

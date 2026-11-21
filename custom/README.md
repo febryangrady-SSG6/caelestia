@@ -185,6 +185,26 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** Clicking a status icon (e.g. Battery while Notifications sidebar is open) opened its popout without setting `popouts.staysOpen = true`, causing `popoutHideTimer` to close it 150ms after the pointer left the icon; `ContentWindow.transientOverlayOpen` also omitted `staysOpen` popouts from overlay input capture.
    - **Fix:** Sets `popouts.staysOpen = true` in `BarIcon.openPopout()` and includes `(panels.popouts.staysOpen && panels.popouts.hasCurrent)` in `ContentWindow.transientOverlayOpen` so click-opened popouts stay open until clicked away, toggled, or dismissed with `Esc`.
 
+31. **`0031-fix-bar-balance-TrayOverflow-padding-and-float-hover.patch`**
+   - **File:** `shell/modules/bar/popouts/TrayOverflow.qml`
+   - **Problem:** `minRows: 2` forced a single row of tray icons into a 2-row-tall box (huge top/bottom margin) while `implicitWidth` had 0px horizontal padding; clamping `nameTag` inside the box then covered the icons and clipped the label.
+   - **Fix:** Sets `minRows: 1`, caps `columns` to `filled` when non-empty, adds uniform `Tokens.padding.medium` padding on all four sides, and reparents `nameTag` to `root.Window.contentItem` positioned outside the box.
+
+32. **`0032-fix-utilities-size-TimersCard-duration-field-to-fit-.patch`**
+   - **File:** `shell/modules/utilities/cards/TimersCard.qml`
+   - **Problem:** `digitsField` had a hardcoded `Layout.preferredWidth: 96`, causing the `"300 = 3:00"` placeholder to overflow its right outline border.
+   - **Fix:** Measures `digitsField.placeholderText` with `TextMetrics` and sets `Layout.preferredWidth: Math.max(96, Math.ceil(digitsPlaceholderMetrics.width) + leftPadding + rightPadding)`.
+
+33. **`0033-fix-colors-repair-KDE-View-DecorationFocus-and-Decor.patch`**
+   - **File:** `src/bin/caelestia-color`
+   - **Problem:** The vendored Matugen KDE template set `[Colors:View] DecorationFocus` to dark `primary_container` (`#254777`) while `[Colors:Selection] ForegroundNormal` is `#000000`, causing Darkly to render focused push buttons (e.g. Konsole's **Cancel** button) with black text on dark blue.
+   - **Fix:** Updates `cmd_kde_selection()` to repair `[Colors:View]` `DecorationFocus` and `DecorationHover` to `#{primary}` whenever their WCAG contrast against `sel_fg` is `< 4.5`.
+
+34. **`0034-fix-nexus-open-requested-page-or-subpage-directly-in.patch`**
+   - **File:** `shell/modules/nexus/PageCompRegistry.qml`
+   - **Problem:** `defaultPageForCategoryKey("bluetooth")` (and `"audio"`) resolved the parent category index and returned that category's default page (`"network"` / `"displays"`) instead of the requested page key, so clicking **Open settings** in the Bluetooth popout opened Network instead of Bluetooth.
+   - **Fix:** Returns `categories[i].defaultPage` only when `key` matches a category key, and returns `key` itself when it matches a page or subpage key.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

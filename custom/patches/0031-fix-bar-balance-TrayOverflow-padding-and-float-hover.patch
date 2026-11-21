@@ -1,0 +1,98 @@
+From a7d91929ed0c096e2832777856f3af6c97f289bd Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 22:17:02 +0700
+Subject: [PATCH] fix(bar): balance TrayOverflow padding and float hover
+ nameTag outside box
+
+---
+ shell/modules/bar/popouts/TrayOverflow.qml | 45 ++++++++++++++--------
+ 1 file changed, 28 insertions(+), 17 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/TrayOverflow.qml b/shell/modules/bar/popouts/TrayOverflow.qml
+index f20fdcdb..a880b515 100644
+--- a/shell/modules/bar/popouts/TrayOverflow.qml
++++ b/shell/modules/bar/popouts/TrayOverflow.qml
+@@ -44,13 +44,14 @@ Item {
+     // few before it holds any: one icon should not leave a hole the size of one icon.
+     readonly property int maxRows: 4
+     readonly property int minColumns: 3
+-    readonly property int minRows: 2
++    readonly property int minRows: 1
+     readonly property int filled: root.items.length + root.widgets.length
+-    readonly property int columns: Math.max(root.minColumns, Math.ceil(Math.sqrt(root.filled)), Math.ceil(root.filled / root.maxRows))
++    readonly property int columns: root.filled > 0 ? Math.min(root.filled, Math.max(root.minColumns, Math.ceil(Math.sqrt(root.filled)), Math.ceil(root.filled / root.maxRows))) : root.minColumns
+     readonly property int rows: Math.max(root.minRows, Math.ceil(root.filled / root.columns))
+ 
+     readonly property real cell: 34 * root.scaleOffset * root.fontScale
+     readonly property real gap: Tokens.spacing.small * root.scaleOffset
++    readonly property real padding: Tokens.padding.medium * root.scaleOffset
+     readonly property real gridWidth: root.columns * root.cell + (root.columns - 1) * root.gap
+     readonly property real gridHeight: root.rows * root.cell + (root.rows - 1) * root.gap
+     // The box leans in when a drag is over it, so it is obvious the icon will land
+@@ -133,11 +134,11 @@ Item {
+         }
+     }
+ 
+-    // The panel frames the grid; the box is exactly the cells it holds. Measuring the
++    // The panel frames the grid with uniform padding on all four sides. Measuring the
+     // grid instead would let whatever a cell holds set the size, and one wide widget put
+     // in a cell would open the box halfway across the screen.
+-    implicitWidth: root.gridWidth
+-    implicitHeight: root.gridHeight
++    implicitWidth: root.gridWidth + root.padding * 2
++    implicitHeight: root.gridHeight + root.padding * 2
+     width: implicitWidth
+     height: implicitHeight
+ 
+@@ -275,26 +276,36 @@ Item {
+         // will fill it reads as something to press, and there is nothing there to press.
+     }
+ 
+-    // What the pointer is over, in words, on the icon it is over. It is drawn rather than
+-    // floated: see hoveredItem. Clamped inside the box, because the box is a surface and
+-    // its content is cut to it.
++    // What the pointer is over, in words, hovering outside the box so it never covers
++    // the icons or gets clipped by the box's bounds. Drawn as a non-interactive StyledRect
++    // on Window.contentItem rather than a Popup so it never steals hover from the icon.
+     StyledRect {
+         id: nameTag
+ 
+-        readonly property var origin: root.hoveredItem ? root.mapFromItem(root.hoveredItem, 0, 0) : null
++        readonly property Item winContent: root.Window.contentItem
++        readonly property var boxOrigin: (root.visible && winContent && root.hoveredItem) ? root.mapToItem(winContent, 0, 0) : null
++        readonly property var iconOrigin: (root.visible && winContent && root.hoveredItem) ? root.hoveredItem.mapToItem(winContent, 0, 0) : null
++        readonly property real edgePad: Tokens.padding.small * root.scaleOffset
++        readonly property real outsideGap: Tokens.spacing.small * root.scaleOffset
+ 
+-        z: 10
+-        visible: root.hoveredLabel.length > 0 && root.hoveredItem !== null
++        parent: winContent
++        z: 10000
++        visible: root.visible && root.hoveredLabel.length > 0 && root.hoveredItem !== null && winContent !== null
+         implicitWidth: nameText.implicitWidth + Tokens.padding.medium * 2
+         implicitHeight: nameText.implicitHeight + Tokens.padding.small * 2
+-        x: nameTag.origin ? Math.min(Math.max(nameTag.origin.x + (root.hoveredItem.width - nameTag.width) / 2, Tokens.padding.small), Math.max(Tokens.padding.small, root.width - nameTag.width - Tokens.padding.small)) : 0
++        x: {
++            if (!nameTag.iconOrigin || !nameTag.winContent)
++                return 0;
++            const ideal = nameTag.iconOrigin.x + (root.hoveredItem.width - nameTag.width) / 2;
++            return Math.min(Math.max(ideal, nameTag.edgePad), Math.max(nameTag.edgePad, nameTag.winContent.width - nameTag.width - nameTag.edgePad));
++        }
+         y: {
+-            if (!nameTag.origin)
++            if (!nameTag.boxOrigin || !nameTag.winContent)
+                 return 0;
+-            const above = nameTag.origin.y - nameTag.height - Tokens.spacing.extraSmall;
+-            const below = nameTag.origin.y + root.hoveredItem.height + Tokens.spacing.extraSmall;
+-            const wanted = above >= Tokens.padding.small ? above : below;
+-            return Math.min(Math.max(wanted, Tokens.padding.small), Math.max(Tokens.padding.small, root.height - nameTag.height - Tokens.padding.small));
++            const above = nameTag.boxOrigin.y - nameTag.height - nameTag.outsideGap;
++            const below = nameTag.boxOrigin.y + root.height + nameTag.outsideGap;
++            const wanted = above >= nameTag.edgePad ? above : below;
++            return Math.min(Math.max(wanted, nameTag.edgePad), Math.max(nameTag.edgePad, nameTag.winContent.height - nameTag.height - nameTag.edgePad));
+         }
+         radius: Tokens.rounding.medium
+         color: Colours.palette.m3surfaceContainerHighest
+-- 
+2.56.1
+

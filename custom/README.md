@@ -171,6 +171,20 @@ bash ~/caelestia-kde/custom/apply.sh
    - **Problem:** Clicking **Install Updates** on `Caelestia Updates` notifications did nothing: `caelestia-check-updates` used `notify-send -w -t 300000` (dying after 5 minutes / across restarts so persisted notifications had no `invoke` callback), called nonexistent `caelestia shell toggleNexus`, left `$REPO` undefined, and opened Nexus Updates (which hides Install Update when only system packages are pending).
    - **Fix:** Adds `NotifData.invokeAction(action)` (shared by `Notification.qml` and `NotifActionList.qml`) so `Caelestia Updates` **Install Updates** / **Close** actions work even on expired or persisted notifications — launching the system package updater (`yay -Syu` / `sudo pacman -Syu` / `flatpak update`) in the configured terminal for `System Update Available`, or opening Nexus Updates (`nexus openPage updates -1`) for Caelestia UI updates — and fixes `$REPO` + the fallback handler in `src/bin/caelestia-check-updates`.
 
+28. **`0028-fix-bluetooth-size-disconnect-and-delete-icon-button.patch`**
+   - **File:** `shell/modules/bar/popouts/Bluetooth.qml`
+   - **Problem:** `connectBtn` never set `implicitWidth`/`implicitHeight` (only `Layout.preferredWidth` in points rather than pixels), so the delete button `Loader` bound its `Item` to `0×0` — causing the `delete` icon to overflow left into `link_off` (collapsing `ListRow` spacing) and leaving its `StateLayer` hit area at `0×0`.
+   - **Fix:** Sizes `connectBtn` and the delete button `Item` to match their rendered `MaterialIcon` dimensions (`Math.max(icon.implicitWidth, ...)`), restoring clean `ListRow` spacing and a clickable delete target.
+
+29. **`0029-feat-bar-allow-scrolling-on-volume-and-microphone-st.patch`**
+   - **Files:** `shell/modules/bar/components/BarIcon.qml`, `shell/modules/bar/components/StatusIcon.qml`
+   - **Summary:** Adds opt-in `acceptsWheel` and `wheelScrolled(angleDelta)` to `BarIcon`'s `MouseArea` (leaving wheel events unaccepted for non-opted-in icons) and wires `StatusIcon` `"audio"` / `"microphone"` to `Audio.incrementVolume()` / `Audio.decrementVolume()` and `Audio.incrementSourceVolume()` / `Audio.decrementSourceVolume()`.
+
+30. **`0030-fix-bar-keep-click-opened-status-icon-popouts-open-u.patch`**
+   - **Files:** `shell/modules/bar/components/BarIcon.qml`, `shell/modules/drawers/ContentWindow.qml`
+   - **Problem:** Clicking a status icon (e.g. Battery while Notifications sidebar is open) opened its popout without setting `popouts.staysOpen = true`, causing `popoutHideTimer` to close it 150ms after the pointer left the icon; `ContentWindow.transientOverlayOpen` also omitted `staysOpen` popouts from overlay input capture.
+   - **Fix:** Sets `popouts.staysOpen = true` in `BarIcon.openPopout()` and includes `(panels.popouts.staysOpen && panels.popouts.hasCurrent)` in `ContentWindow.transientOverlayOpen` so click-opened popouts stay open until clicked away, toggled, or dismissed with `Esc`.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

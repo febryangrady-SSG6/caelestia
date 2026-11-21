@@ -1,0 +1,39 @@
+From 21a23a9ba0853a76e1ce681d2b7632a7b5efa925 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 21:22:24 +0700
+Subject: [PATCH] fix(bar): keep click-opened status icon popouts open until
+ dismissed
+
+---
+ shell/modules/bar/components/BarIcon.qml | 1 +
+ shell/modules/drawers/ContentWindow.qml  | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/shell/modules/bar/components/BarIcon.qml b/shell/modules/bar/components/BarIcon.qml
+index 9ef71005..217b6bef 100644
+--- a/shell/modules/bar/components/BarIcon.qml
++++ b/shell/modules/bar/components/BarIcon.qml
+@@ -78,6 +78,7 @@ Item {
+         popouts.currentName = name;
+         popouts.currentCenter = root.isHorizontal ? root.mapToItem(null, root.width / 2, 0).x : root.mapToItem(null, 0, root.height / 2).y;
+         popouts.hasCurrent = true;
++        popouts.staysOpen = true;
+     }
+ 
+     implicitWidth: root.isHorizontal ? Math.round(glyphLoader.implicitWidth) : root.barThickness
+diff --git a/shell/modules/drawers/ContentWindow.qml b/shell/modules/drawers/ContentWindow.qml
+index 41b4ee1b..cd38d9d4 100644
+--- a/shell/modules/drawers/ContentWindow.qml
++++ b/shell/modules/drawers/ContentWindow.qml
+@@ -44,7 +44,7 @@ StyledWindow {
+     // A new one joins a list instead of extending the expression below.
+     readonly property var desktopMenus: [desktopContextMenu, desktopIconContextMenu, dropMenu]
+     readonly property var desktopPopups: [viewOptions, widgetGallery, widgetSettings]
+-    readonly property bool transientOverlayOpen: panels.popouts.isDetached || panels.popouts.isContextPopout || root.desktopMenus.some(menu => menu.expanded) || root.desktopPopups.some(popup => popup.open) || visibilities.overview || (Visibilities.launcherOpen && Config.launcher.enabled) || (Config.dashboard.enabled && visibilities.dashboard) || (Config.session.enabled && visibilities.session) || (Config.utilities.enabled && visibilities.utilities)
++    readonly property bool transientOverlayOpen: panels.popouts.isDetached || panels.popouts.isContextPopout || (panels.popouts.staysOpen && panels.popouts.hasCurrent) || root.desktopMenus.some(menu => menu.expanded) || root.desktopPopups.some(popup => popup.open) || visibilities.overview || (Visibilities.launcherOpen && Config.launcher.enabled) || (Config.dashboard.enabled && visibilities.dashboard) || (Config.session.enabled && visibilities.session) || (Config.utilities.enabled && visibilities.utilities)
+     readonly property bool hasOpenOverlay: focusGrabState.active || transientOverlayOpen || (Config.sidebar.enabled && visibilities.sidebar)
+     readonly property bool hasFullscreen: actualFullscreen && !hasOpenOverlay
+     // The launcher is one panel across outputs: a screen that does not show it
+-- 
+2.56.1
+

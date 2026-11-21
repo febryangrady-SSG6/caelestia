@@ -44,12 +44,20 @@ if [[ -d "$QS_TARGET" ]]; then
         "$QS_TARGET/modules/bar/BarWidgets.qml"
     install -Dm755 "$REPO_ROOT/shell/modules/bar/BarWrapper.qml" \
         "$QS_TARGET/modules/bar/BarWrapper.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/components/BarIcon.qml" \
+        "$QS_TARGET/modules/bar/components/BarIcon.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/components/Dock.qml" \
         "$QS_TARGET/modules/bar/components/Dock.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/components/StatusIcon.qml" \
+        "$QS_TARGET/modules/bar/components/StatusIcon.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/BarComponentContext.qml" \
         "$QS_TARGET/modules/bar/popouts/BarComponentContext.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Bluetooth.qml" \
+        "$QS_TARGET/modules/bar/popouts/Bluetooth.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/bar/popouts/Greeter.qml" \
         "$QS_TARGET/modules/bar/popouts/Greeter.qml"
+    install -Dm644 "$REPO_ROOT/shell/modules/drawers/ContentWindow.qml" \
+        "$QS_TARGET/modules/drawers/ContentWindow.qml"
     install -Dm644 "$REPO_ROOT/shell/utils/Launch.qml" \
         "$QS_TARGET/utils/Launch.qml"
     install -Dm644 "$REPO_ROOT/shell/modules/nexus/PageRowIndex.qml" \

@@ -1,0 +1,79 @@
+From 381ad761307ae453f75b766206b0800db5dcd7e6 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 21:21:36 +0700
+Subject: [PATCH] feat(bar): allow scrolling on volume and microphone status
+ icons
+
+---
+ shell/modules/bar/components/BarIcon.qml    | 13 +++++++++++++
+ shell/modules/bar/components/StatusIcon.qml | 16 ++++++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/shell/modules/bar/components/BarIcon.qml b/shell/modules/bar/components/BarIcon.qml
+index 9bc00dc7..9ef71005 100644
+--- a/shell/modules/bar/components/BarIcon.qml
++++ b/shell/modules/bar/components/BarIcon.qml
+@@ -36,6 +36,9 @@ Item {
+     // reason to keep its name back. The box shows that name itself: a tooltip is a window,
+     // and one opened over a box this small takes the hover away from the icon under it.
+     property bool insidePopout: false
++    // Icons that handle mouse-wheel input directly (e.g. volume/microphone) opt in here;
++    // others leave wheel events unaccepted so the bar's default scroll actions still run.
++    property bool acceptsWheel: false
+ 
+     readonly property bool isHorizontal: Config.bar.position === "top" || Config.bar.position === "bottom"
+     // The bar thins itself with a curve rather than in step with the number, and the icons
+@@ -59,6 +62,7 @@ Item {
+     signal activated()
+     signal middleActivated()
+     signal contextMenuRequested()
++    signal wheelScrolled(angleDelta: point)
+ 
+     // The menu a widget opens sits above the icon it belongs to.
+     function openPopout(name: string): void {
+@@ -132,6 +136,15 @@ Item {
+             else
+                 root.activated();
+         }
++
++        onWheel: wheel => {
++            if (!root.acceptsWheel) {
++                wheel.accepted = false;
++                return;
++            }
++            wheel.accepted = true;
++            root.wheelScrolled(wheel.angleDelta);
++        }
+     }
+ 
+     Loader {
+diff --git a/shell/modules/bar/components/StatusIcon.qml b/shell/modules/bar/components/StatusIcon.qml
+index 944619ba..8035e6b7 100644
+--- a/shell/modules/bar/components/StatusIcon.qml
++++ b/shell/modules/bar/components/StatusIcon.qml
+@@ -85,6 +85,22 @@ BarIcon {
+ 
+     onContextMenuRequested: root.openPopout("statusiconscontext")
+ 
++    acceptsWheel: root.iconId === "audio" || root.iconId === "microphone"
++
++    onWheelScrolled: angleDelta => {
++        if (root.iconId === "audio") {
++            if (angleDelta.y > 0)
++                Audio.incrementVolume();
++            else if (angleDelta.y < 0)
++                Audio.decrementVolume();
++        } else if (root.iconId === "microphone") {
++            if (angleDelta.y > 0)
++                Audio.incrementSourceVolume();
++            else if (angleDelta.y < 0)
++                Audio.decrementSourceVolume();
++        }
++    }
++
+     glyphComponent: {
+         switch (root.iconId) {
+         case "lockStatus":
+-- 
+2.56.1
+

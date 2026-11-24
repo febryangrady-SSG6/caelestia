@@ -291,6 +291,11 @@ If an upstream release causes a patch in `custom/patches/` to fail `--check-patc
    - **Problem:** `FileDialog`'s `FloatingWindow` set `color: Colours.tPalette.m3surface` and `surfaceFormat.opaque: false` without a `BackgroundEffect.blurRegion`, rendering translucent glass with no KWin backdrop blur.
    - **Fix:** Adds `BackgroundEffect.blurRegion` bound to `dialogContent` when `GlobalConfig.appearance.transparency.enabled && GlobalConfig.appearance.blur` (matching `WhatsNewWindow.qml`).
 
+52. **`0049-fix-colors-disable-KDE-inactive-selection-color-shif.patch`**
+   - **File:** `src/bin/caelestia-color`
+   - **Problem:** `[ColorEffects:Inactive] ChangeSelectionColor=true` in the vendored Matugen KDE color scheme dimmed selected items (e.g. Dolphin's Places sidebar) to dark grey with white text whenever a panel or window lost focus.
+   - **Fix:** Forces `ChangeSelectionColor=false` in `cmd_kde_selection()` so selected items consistently keep the standard active selection background and foreground colors.
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

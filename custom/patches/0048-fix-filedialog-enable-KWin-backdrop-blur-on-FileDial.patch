@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Tue, 24 Nov 2026 23:34:00 +0700
+Subject: [PATCH 48/48] fix(filedialog): enable KWin backdrop blur on FileDialog window
+
+---
+ shell/components/filedialog/FileDialog.qml | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/shell/components/filedialog/FileDialog.qml b/shell/components/filedialog/FileDialog.qml
+index 3e15f4e6..8d6c92c1 100644
+--- a/shell/components/filedialog/FileDialog.qml
++++ b/shell/components/filedialog/FileDialog.qml
+@@ -3,6 +3,8 @@ pragma ComponentBehavior: Bound
+ import QtQuick
+ import QtQuick.Layouts
+ import Quickshell
++import Quickshell.Wayland
++import Caelestia.Config
+ import qs.components
+ import qs.services
+ import qs.utils
+@@ -92,6 +94,11 @@ LazyLoader {
+         surfaceFormat.opaque: false
+         title: loader.title
+ 
++        BackgroundEffect.blurRegion: Region {
++            Region { x: -10; y: -10; width: 1; height: 1 }
++            Region { item: (GlobalConfig.appearance.transparency.enabled && GlobalConfig.appearance.blur) ? dialogContent : null }
++        }
++
+         onVisibleChanged: {
+             if (!visible)
+                 rejected();
+@@ -98,6 +105,8 @@ LazyLoader {
+         }
+ 
+         RowLayout {
++            id: dialogContent
++
+             anchors.fill: parent
+ 
+             spacing: 0
+-- 
+2.56.1

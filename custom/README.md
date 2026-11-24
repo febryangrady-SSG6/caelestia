@@ -286,6 +286,11 @@ If an upstream release causes a patch in `custom/patches/` to fail `--check-patc
    - **Problem:** `caelestiaLogo` rendered `topColour` and the KDE badge in `m3primary` on top of `m3primaryContainer`, producing very low contrast in muted schemes.
    - **Fix:** Uses `m3onPrimaryContainer` (75% opacity for the crescent/sparkles, 100% for the swoosh) and `m3onPrimaryContainer` / `m3primaryContainer` for the KDE badge and stroke.
 
+51. **`0048-fix-filedialog-enable-KWin-backdrop-blur-on-FileDial.patch`**
+   - **File:** `shell/components/filedialog/FileDialog.qml`
+   - **Problem:** `FileDialog`'s `FloatingWindow` set `color: Colours.tPalette.m3surface` and `surfaceFormat.opaque: false` without a `BackgroundEffect.blurRegion`, rendering translucent glass with no KWin backdrop blur.
+   - **Fix:** Adds `BackgroundEffect.blurRegion` bound to `dialogContent` when `GlobalConfig.appearance.transparency.enabled && GlobalConfig.appearance.blur` (matching `WhatsNewWindow.qml`).
+
 ---
 
 ## Inventory of System & Config Overrides (`custom/apply.sh`)

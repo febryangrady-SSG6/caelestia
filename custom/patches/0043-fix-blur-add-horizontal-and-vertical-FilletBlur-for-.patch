@@ -1,0 +1,66 @@
+From 19f37c23c40f8e2f09c71a76aee72c3e8064858e Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 03:10:39 +0700
+Subject: [PATCH 43/47] fix(blur): add horizontal and vertical FilletBlur for
+ notification popups
+
+---
+ shell/modules/drawers/ContentWindow.qml | 35 ++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 4 deletions(-)
+
+diff --git a/shell/modules/drawers/ContentWindow.qml b/shell/modules/drawers/ContentWindow.qml
+index fca5a6a6..497a6f6d 100644
+--- a/shell/modules/drawers/ContentWindow.qml
++++ b/shell/modules/drawers/ContentWindow.qml
+@@ -1041,10 +1041,10 @@ StyledWindow {
+         BlurMask {
+             target: panels.notifications
+             contentItem: root.contentItem
+-            blurOffsetTop: root.blurOffsetTop
+-            blurOffsetBottom: root.blurOffsetBottom
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetTop: root.blurOffsetTop - (panels.notifications.vAnchor === "top" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetBottom: root.blurOffsetBottom - (panels.notifications.vAnchor === "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetLeft: root.blurOffsetLeft - (panels.notifications.hAnchor === "left" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetRight: root.blurOffsetRight - (panels.notifications.hAnchor === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             vAnchor: panels.notifications.vAnchor
+             hAnchor: panels.notifications.hAnchor
+             deformMatrix: notifsBg.deformMatrix
+@@ -1242,6 +1242,33 @@ StyledWindow {
+             leftOpen: !panels.popoutsWrapper.attachedTop && leftEdge > root.borderThickness + 2 && !(bar.position === "bottom" && popoutBg.connectedToSidebar)
+             rightOpen: !panels.popoutsWrapper.attachedBottom && rightEdge < root.height - root.borderThickness - 2 && !(bar.position === "top" && popoutBg.connectedToSidebar)
+         }
++        FilletBlur {
++            active: panels.notifications.visible && panels.notifications.width > 0 && panels.notifications.height > 4
++            leftEdge: Math.round(panels.notifications.x + panels.leftMargin)
++            rightEdge: Math.round(panels.notifications.x + panels.leftMargin + panels.notifications.width)
++            anchorY: panels.notifications.vAnchor === "bottom"
++                ? Math.round(root.height - Math.max(bar.position === "bottom" ? bar.implicitHeight : 0, root.borderThickness))
++                : Math.round(Math.max(bar.position === "top" ? bar.implicitHeight : 0, root.borderThickness))
++            direction: panels.notifications.vAnchor === "bottom" ? -1 : 1
++            maxExtent: panels.notifications.height
++            deformMatrix: notifsBg.deformMatrix
++            leftOpen: panels.notifications.hAnchor !== "left" && leftEdge > root.borderThickness + 2
++            rightOpen: panels.notifications.hAnchor !== "right" && rightEdge < root.width - root.borderThickness - 2
++        }
++        FilletBlur {
++            vertical: true
++            active: (panels.notifications.hAnchor === "left" || panels.notifications.hAnchor === "right") && panels.notifications.visible && panels.notifications.width > 4 && panels.notifications.height > 0
++            leftEdge: Math.round(panels.notifications.y + panels.topMargin)
++            rightEdge: Math.round(panels.notifications.y + panels.topMargin + panels.notifications.height)
++            anchorY: panels.notifications.hAnchor === "right"
++                ? Math.round(root.width - Math.max(bar.position === "right" ? bar.implicitWidth : 0, root.borderThickness))
++                : Math.round(Math.max(bar.position === "left" ? bar.implicitWidth : 0, root.borderThickness))
++            direction: panels.notifications.hAnchor === "right" ? -1 : 1
++            maxExtent: panels.notifications.width
++            deformMatrix: notifsBg.deformMatrix
++            leftOpen: panels.notifications.vAnchor !== "top" && leftEdge > root.borderThickness + 2
++            rightOpen: panels.notifications.vAnchor !== "bottom" && rightEdge < root.height - root.borderThickness - 2
++        }
+         BlurMask {
+             target: panels.utilities
+             contentItem: root.contentItem
+-- 
+2.56.1
+

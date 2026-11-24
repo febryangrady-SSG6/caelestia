@@ -1,0 +1,82 @@
+From be80134b3d430549e9d88f71172b39ea525eaece Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:43:39 +0700
+Subject: [PATCH 05/47] fix(menu): avoid QtQuick.Controls.Menu shadowing and
+ clamp x
+
+---
+ shell/components/controls/Menu.qml | 30 ++++++++++++++++++------------
+ 1 file changed, 18 insertions(+), 12 deletions(-)
+
+diff --git a/shell/components/controls/Menu.qml b/shell/components/controls/Menu.qml
+index 63543a25..3dfbe87a 100644
+--- a/shell/components/controls/Menu.qml
++++ b/shell/components/controls/Menu.qml
+@@ -1,7 +1,7 @@
+ pragma ComponentBehavior: Bound
+ 
+ import QtQuick
+-import QtQuick.Controls
++import QtQuick.Controls as Controls
+ import QtQuick.Effects
+ import QtQuick.Layouts
+ import Quickshell
+@@ -270,14 +270,20 @@ MouseArea {
+             const item = root.attachTo;
+             if (!item || !root.parent)
+                 return 0;
+-            let off = root.attachSideX === Menu.Left ? 0 : item.width;
+-            if (root.thisSideX === Menu.Right)
+-                off -= width;
+-            const pt = item.mapToItem(root.parent, off, 0);
+-            // Keep the panel inside the window: near the right edge there is no room
+-            // to unfold outwards, and it used to end up half off screen.
+-            const w = Math.max(menu.implicitWidth, menu.width);
+-            return Math.max(0, Math.min(root.parent.width - w, (pt ? pt.x : 0) + root.marginX));
++            const attachOff = root.attachSideX === Menu.Left ? 0 : item.width;
++            const pt = item.mapToItem(root.parent, attachOff, 0);
++            const anchorX = (pt ? pt.x : 0) + root.marginX;
++            const fullW = menu.implicitWidth;
++            const parentW = root.parent.width;
++            if (root.thisSideX === Menu.Right) {
++                const clampedAnchorX = parentW >= fullW && parentW > 0
++                    ? Math.max(fullW, Math.min(anchorX, parentW))
++                    : anchorX;
++                return clampedAnchorX - menu.width;
++            }
++            if (parentW >= fullW && parentW > 0)
++                return Math.max(0, Math.min(anchorX, parentW - fullW));
++            return Math.max(0, anchorX);
+         }
+         y: {
+             watcher.transform;
+@@ -286,7 +292,7 @@ MouseArea {
+                 return 0;
+             let off = root.attachSideY === Menu.Top ? 0 : item.height;
+             if (root.thisSideY === Menu.Bottom)
+-                off -= height;
++                off -= menu.height;
+             const pt = item.mapToItem(root.parent, 0, off);
+             // Same for the vertical axis: never leave the window.
+             const h = Math.max(menu.implicitHeight, menu.height);
+@@ -352,7 +358,7 @@ MouseArea {
+ 
+                 interactive: contentHeight > height
+ 
+-                ScrollBar.vertical: StyledScrollBar {
++                Controls.ScrollBar.vertical: StyledScrollBar {
+                     flickable: flickable
+                 }
+ 
+@@ -466,7 +472,7 @@ MouseArea {
+ 
+                 interactive: contentHeight > height
+ 
+-                ScrollBar.vertical: StyledScrollBar {
++                Controls.ScrollBar.vertical: StyledScrollBar {
+                     flickable: submenuFlickable
+                 }
+ 
+-- 
+2.56.1
+

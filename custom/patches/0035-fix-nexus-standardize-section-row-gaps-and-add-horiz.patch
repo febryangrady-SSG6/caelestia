@@ -1,0 +1,72 @@
+From d57bdf5fe0f596c986785ac3e2aa22eee3745c94 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 00:22:00 +0700
+Subject: [PATCH 35/47] fix(nexus): standardize section row gaps and add
+ horizontal header padding
+
+---
+ shell/modules/nexus/common/PageBase.qml                   | 2 ++
+ shell/modules/nexus/pages/desktop/DesktopAddonsPage.qml   | 2 +-
+ shell/modules/nexus/pages/wallandstyle/AppearancePage.qml | 6 +++---
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/shell/modules/nexus/common/PageBase.qml b/shell/modules/nexus/common/PageBase.qml
+index 299adffa..9f82f376 100644
+--- a/shell/modules/nexus/common/PageBase.qml
++++ b/shell/modules/nexus/common/PageBase.qml
+@@ -342,6 +342,8 @@ ColumnLayout {
+             id: header
+ 
+             anchors.fill: parent
++            anchors.leftMargin: Tokens.padding.medium
++            anchors.rightMargin: Tokens.padding.medium
+             spacing: Tokens.spacing.largeIncreased
+ 
+             Loader {
+diff --git a/shell/modules/nexus/pages/desktop/DesktopAddonsPage.qml b/shell/modules/nexus/pages/desktop/DesktopAddonsPage.qml
+index 3a1a790a..842bf849 100644
+--- a/shell/modules/nexus/pages/desktop/DesktopAddonsPage.qml
++++ b/shell/modules/nexus/pages/desktop/DesktopAddonsPage.qml
+@@ -91,7 +91,7 @@ PageBase {
+ 
+         ColumnLayout {
+             Layout.fillWidth: true
+-            spacing: 0
++            spacing: Tokens.spacing.extraSmall / 2
+ 
+             SelectRow {
+                 first: true
+diff --git a/shell/modules/nexus/pages/wallandstyle/AppearancePage.qml b/shell/modules/nexus/pages/wallandstyle/AppearancePage.qml
+index 4b93bcf2..4ae2352f 100644
+--- a/shell/modules/nexus/pages/wallandstyle/AppearancePage.qml
++++ b/shell/modules/nexus/pages/wallandstyle/AppearancePage.qml
+@@ -344,7 +344,7 @@ PageBase {
+ 
+         ColumnLayout {
+             Layout.fillWidth: true
+-            spacing: 0
++            spacing: Tokens.spacing.extraSmall / 2
+ 
+             ToggleRow {
+                 first: true
+@@ -404,7 +404,7 @@ PageBase {
+ 
+         ColumnLayout {
+             Layout.fillWidth: true
+-            spacing: 0
++            spacing: Tokens.spacing.extraSmall / 2
+ 
+             ToggleRow {
+                 first: true
+@@ -460,7 +460,7 @@ PageBase {
+ 
+         ColumnLayout {
+             Layout.fillWidth: true
+-            spacing: 0
++            spacing: Tokens.spacing.extraSmall / 2
+ 
+             StepperRow {
+                 reset: ({ node: GlobalConfig.border, setting: "thickness" })
+-- 
+2.56.1
+

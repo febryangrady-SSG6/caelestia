@@ -1,0 +1,128 @@
+From 2b9e718d9540b387f1e9a029aa7444153b672051 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:58:34 +0700
+Subject: [PATCH 07/47] fix(tooltip): walk to window root item instead of
+ stopping at immediate parent
+
+---
+ shell/components/controls/Tooltip.qml | 69 +++++++++++++--------------
+ 1 file changed, 33 insertions(+), 36 deletions(-)
+
+diff --git a/shell/components/controls/Tooltip.qml b/shell/components/controls/Tooltip.qml
+index 937ca4b7..ecb4d12f 100644
+--- a/shell/components/controls/Tooltip.qml
++++ b/shell/components/controls/Tooltip.qml
+@@ -33,35 +33,31 @@ Popup {
+     }
+ 
+     function updatePosition() {
+-        if (!target || !parent)
++        if (!target || !parent || !tooltipRect)
+             return;
+ 
+-        Qt.callLater(() => {
+-            if (!target || !parent || !tooltipRect)
+-                return;
++        const targetPos = target.mapToItem(parent, 0, 0);
++        const targetCenterX = targetPos.x + target.width / 2;
+ 
+-            const targetPos = target.mapToItem(parent, 0, 0);
+-            const targetCenterX = targetPos.x + target.width / 2;
++        // Get tooltip size (use width/height if available, otherwise implicit)
++        const tooltipWidth = tooltipRect.width > 0 ? tooltipRect.width : tooltipRect.implicitWidth;
++        const tooltipHeight = tooltipRect.height > 0 ? tooltipRect.height : tooltipRect.implicitHeight;
+ 
+-            // Get tooltip size (use width/height if available, otherwise implicit)
+-            const tooltipWidth = tooltipRect.width > 0 ? tooltipRect.width : tooltipRect.implicitWidth;
+-            const tooltipHeight = tooltipRect.height > 0 ? tooltipRect.height : tooltipRect.implicitHeight;
++        let newX = targetCenterX - tooltipWidth / 2;
++        let newY = targetPos.y - tooltipHeight - Tokens.spacing.small;
+ 
+-            let newX = targetCenterX - tooltipWidth / 2;
+-
+-            let newY = targetPos.y - tooltipHeight - Tokens.spacing.small;
+-
+-            const padding = Tokens.padding.medium;
+-            newX = CUtils.clamp(newX, padding, parent.width - tooltipWidth - padding);
+-            // Above the target by default; below it when there is no room above (a
+-            // top bar's widgets), so a tooltip never lands off the screen.
+-            if (newY < padding) {
+-                newY = CUtils.clamp(targetPos.y + target.height + Tokens.spacing.small, padding, parent.height - tooltipHeight - padding);
+-            }
++        const padding = Tokens.padding.medium;
++        const maxX = Math.max(padding, parent.width - tooltipWidth - padding);
++        newX = CUtils.clamp(newX, padding, maxX);
++        // Above the target by default; below it when there is no room above (a
++        // top bar's widgets), so a tooltip never lands off the screen.
++        if (newY < padding) {
++            const maxY = Math.max(padding, parent.height - tooltipHeight - padding);
++            newY = CUtils.clamp(targetPos.y + target.height + Tokens.spacing.small, padding, maxY);
++        }
+ 
+-            x = newX;
+-            y = newY;
+-        });
++        x = newX;
++        y = newY;
+     }
+ 
+     parent: {
+@@ -70,15 +66,9 @@ Popup {
+         if (target.Window && target.Window.contentItem)
+             return target.Window.contentItem;
+         let p = target;
+-        while (p && p.parent) {
+-            const parentItem = p.parent;
+-            if (parentItem && parentItem.anchors && parentItem.anchors.fill) {
+-                return parentItem;
+-            }
+-            p = parentItem;
+-        }
+-        // Fallback
+-        return target.parent?.parent?.parent ?? target.parent?.parent ?? target.parent ?? target ?? null;
++        while (p && p.parent)
++            p = p.parent;
++        return p ?? null;
+     }
+ 
+     visible: tooltipVisible
+@@ -90,6 +80,7 @@ Popup {
+ 
+     onTooltipVisibleChanged: {
+         if (tooltipVisible) {
++            updatePosition();
+             Qt.callLater(updatePosition);
+         }
+     }
+@@ -179,11 +170,10 @@ Popup {
+ 
+     Connections {
+         function onHoveredChanged() {
+-            if (target.hovered) {
+-                showTimer.start();
++            if (target.hovered && target.visible) {
++                showTimer.restart();
+                 if (timeout > 0) {
+-                    hideTimer.stop();
+-                    hideTimer.start();
++                    hideTimer.restart();
+                 }
+             } else {
+                 showTimer.stop();
+@@ -191,6 +181,13 @@ Popup {
+                 tooltipVisible = false;
+             }
+         }
++        function onVisibleChanged() {
++            if (!target.visible) {
++                showTimer.stop();
++                hideTimer.stop();
++                tooltipVisible = false;
++            }
++        }
+ 
+         target: root.target
+     }
+-- 
+2.56.1
+

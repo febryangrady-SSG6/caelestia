@@ -1,0 +1,86 @@
+From 796bbcca78cbdcd32ddacc77f28f99579ececf08 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 01:49:34 +0700
+Subject: [PATCH 14/47] feat(launcher): animate session confirmation popup
+ enter and exit
+
+---
+ shell/modules/launcher/Content.qml | 55 +++++++++++++++++++++++++++---
+ 1 file changed, 50 insertions(+), 5 deletions(-)
+
+diff --git a/shell/modules/launcher/Content.qml b/shell/modules/launcher/Content.qml
+index 5bac665a..6fb6fc6e 100644
+--- a/shell/modules/launcher/Content.qml
++++ b/shell/modules/launcher/Content.qml
+@@ -841,6 +841,40 @@ Item {
+         y: Math.round((root.height - height) / 2)
+         padding: root.padding
+ 
++        enter: Transition {
++            NumberAnimation {
++                property: "opacity"
++                from: 0
++                to: 1
++                duration: root.Tokens.anim.durations.expressiveDefaultEffects
++                easing: root.Tokens.anim.expressiveDefaultEffects
++            }
++            NumberAnimation {
++                property: "scale"
++                from: 0.88
++                to: 1
++                duration: root.Tokens.anim.durations.expressiveFastSpatial
++                easing: root.Tokens.anim.expressiveFastSpatial
++            }
++        }
++
++        exit: Transition {
++            NumberAnimation {
++                property: "opacity"
++                from: 1
++                to: 0
++                duration: root.Tokens.anim.durations.expressiveFastEffects
++                easing: root.Tokens.anim.expressiveFastEffects
++            }
++            NumberAnimation {
++                property: "scale"
++                from: 1
++                to: 0.92
++                duration: root.Tokens.anim.durations.expressiveFastEffects
++                easing: root.Tokens.anim.expressiveFastEffects
++            }
++        }
++
+         onClosed: {
+             if (root.visibilities.launcher)
+                 search.forceActiveFocus();
+@@ -888,11 +922,22 @@ Item {
+             }
+         }
+ 
+-        background: StyledRect {
+-            radius: root.Tokens.rounding.large
+-            color: Colours.palette.m3surfaceContainerHigh
+-            border.width: 1
+-            border.color: Colours.palette.m3outlineVariant
++        background: Item {
++            Elevation {
++                anchors.fill: sessionBgRect
++                level: 3
++                radius: sessionBgRect.radius
++            }
++
++            StyledRect {
++                id: sessionBgRect
++
++                anchors.fill: parent
++                radius: root.Tokens.rounding.large
++                color: Colours.palette.m3surfaceContainerHigh
++                border.width: 1
++                border.color: Colours.palette.m3outlineVariant
++            }
+         }
+     }
+ }
+-- 
+2.56.1
+

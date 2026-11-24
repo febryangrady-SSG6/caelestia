@@ -1,0 +1,431 @@
+From 0c36bcf57d73e1618facaf19f7ded2737355af0f Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 02:46:21 +0700
+Subject: [PATCH 41/47] fix(blur): fix top-anchored BlurOffsets, add vertical
+ FilletBlur, and snap edge popouts
+
+---
+ shell/modules/bar/popouts/ClipWrapper.qml  |  30 +++--
+ shell/modules/drawers/ContentWindow.qml    |  94 ++++++++++++---
+ shell/modules/drawers/Panels.qml           |   8 +-
+ shell/modules/drawers/blur/BlurOffsets.qml |   8 +-
+ shell/modules/drawers/blur/FilletBlur.qml  | 133 ++++++++++++++-------
+ 5 files changed, 196 insertions(+), 77 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/ClipWrapper.qml b/shell/modules/bar/popouts/ClipWrapper.qml
+index 0b5d1ee4..f622483b 100644
+--- a/shell/modules/bar/popouts/ClipWrapper.qml
++++ b/shell/modules/bar/popouts/ClipWrapper.qml
+@@ -62,6 +62,9 @@ Item {
+     readonly property real lampScaleY: (isLampActive && !isHorizontal && content.nonAnimHeight > 0) ? (height / content.nonAnimHeight) : 1
+ 
+     readonly property real clampedOffsetScale: Math.max(0, offsetScale)
++    // Snap into the screen border when within its smin blend zone (smoothing) so the popout
++    // attaches flush to the border without leaving an unblurred gap between them.
++    readonly property real snapThreshold: !activePanel.isIsland ? Config.border.smoothing : 0
+     // Where x is heading; x itself animates towards it.
+     readonly property real targetX: {
+         if (content.isDetached)
+@@ -72,15 +75,21 @@ Item {
+ 
+             // An item left of the open sidebar gets its popout kept clear of it, so
+             // the sidebar doesn't have to be pushed out of the way.
++            const avoidingSidebar = activePanel === bar && root.visibilities.sidebar && !content.underSidebar;
+             const idealX = content.currentCenter - parent.leftMargin - content.nonAnimWidth / 2;
++            let res;
+             if (effectivePanelWidth >= content.nonAnimWidth) {
+                 const minX = Math.max(0, panelLeft);
+                 const maxX = Math.min(parent.width - content.nonAnimWidth, effectivePanelRight - content.nonAnimWidth);
+-                if (minX <= maxX)
+-                    return Math.max(minX, Math.min(idealX, maxX));
+-                return minX;
++                res = minX <= maxX ? Math.max(minX, Math.min(idealX, maxX)) : minX;
++            } else {
++                res = Math.max(0, Math.min(parent.width - content.nonAnimWidth, effectivePanelCenterX - content.nonAnimWidth / 2));
+             }
+-            return Math.max(0, Math.min(parent.width - content.nonAnimWidth, effectivePanelCenterX - content.nonAnimWidth / 2));
++            if (!avoidingSidebar && parent.width - Math.floor(res + content.nonAnimWidth) <= root.snapThreshold)
++                return Math.max(parent.width - content.nonAnimWidth, 0);
++            if (res <= root.snapThreshold)
++                return 0;
++            return res;
+         }
+         if (activePanel.position === "right")
+             return parent.width - implicitWidth;
+@@ -97,14 +106,19 @@ Item {
+         }
+ 
+         const idealY = content.currentCenter - parent.topMargin - content.nonAnimHeight / 2;
++        let res;
+         if (panelHeight >= content.nonAnimHeight) {
+             const minY = Math.max(0, panelTop);
+             const maxY = Math.min(parent.height - content.nonAnimHeight, panelBottom - content.nonAnimHeight);
+-            if (minY <= maxY)
+-                return Math.max(minY, Math.min(idealY, maxY));
+-            return minY;
++            res = minY <= maxY ? Math.max(minY, Math.min(idealY, maxY)) : minY;
++        } else {
++            res = Math.max(0, Math.min(parent.height - content.nonAnimHeight, panelCenterY - content.nonAnimHeight / 2));
+         }
+-        return Math.max(0, Math.min(parent.height - content.nonAnimHeight, panelCenterY - content.nonAnimHeight / 2));
++        if (parent.height - Math.floor(res + content.nonAnimHeight) <= root.snapThreshold)
++            return Math.max(parent.height - content.nonAnimHeight, 0);
++        if (res <= root.snapThreshold)
++            return 0;
++        return res;
+     }
+ 
+     visible: width > 0 && height > 0
+diff --git a/shell/modules/drawers/ContentWindow.qml b/shell/modules/drawers/ContentWindow.qml
+index b2f49deb..fca5a6a6 100644
+--- a/shell/modules/drawers/ContentWindow.qml
++++ b/shell/modules/drawers/ContentWindow.qml
+@@ -1031,8 +1031,8 @@ StyledWindow {
+             contentItem: root.contentItem
+             blurOffsetTop: root.blurOffsetTop - (!GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             blurOffsetBottom: root.blurOffsetBottom - (!GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetRight: root.blurOffsetRight - (bar.position !== "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             vAnchor: panels.sidebar.vAnchor
+             hAnchor: panels.sidebar.hAnchor
+             offsetScale: panels.sidebar.offsetScale
+@@ -1054,8 +1054,8 @@ StyledWindow {
+             contentItem: root.contentItem
+             blurOffsetTop: root.blurOffsetTop
+             blurOffsetBottom: root.blurOffsetBottom
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetRight: root.blurOffsetRight - (bar.position !== "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             vAnchor: panels.osdWrapper.vAnchor
+             hAnchor: panels.osdWrapper.hAnchor
+             offsetScale: panels.osd.offsetScale
+@@ -1066,8 +1066,8 @@ StyledWindow {
+             contentItem: root.contentItem
+             blurOffsetTop: root.blurOffsetTop
+             blurOffsetBottom: root.blurOffsetBottom
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetRight: root.blurOffsetRight - (bar.position !== "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             vAnchor: panels.sessionWrapper.vAnchor
+             hAnchor: panels.sessionWrapper.hAnchor
+             offsetScale: panels.session.offsetScale
+@@ -1103,10 +1103,10 @@ StyledWindow {
+             // as the box being split across its middle.
+             target: popoutBg.ownsSurface ? null : panels.popoutsWrapper
+             contentItem: root.contentItem
+-            blurOffsetTop: root.blurOffsetTop - (popoutBg.connectedToSidebar ? Tokens.spacing.extraLarge + 10 + Tokens.rounding.extraLarge : 0) - (bar.position === "top" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
+-            blurOffsetBottom: root.blurOffsetBottom - (bar.position === "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
+-            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "left" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
+-            blurOffsetRight: root.blurOffsetRight - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
++            blurOffsetTop: root.blurOffsetTop - (popoutBg.connectedToSidebar ? Tokens.spacing.extraLarge + 10 + Tokens.rounding.extraLarge : 0) - (bar.position === "top" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : (panels.popoutsWrapper.attachedTop && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0))
++            blurOffsetBottom: root.blurOffsetBottom - (bar.position === "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : (panels.popoutsWrapper.attachedBottom && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0))
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "left" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : (panels.popoutsWrapper.attachedLeft && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0))
++            blurOffsetRight: root.blurOffsetRight - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : (panels.popoutsWrapper.attachedRight && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0))
+             vAnchor: panels.popoutsWrapper.vAnchor
+             hAnchor: panels.popoutsWrapper.hAnchor
+             offsetScale: panels.popoutsWrapper.offsetScale
+@@ -1115,14 +1115,14 @@ StyledWindow {
+         // Exact 1px-step circular-arc blur for BlobGroup's circular smin(a, b, k)
+         // concave fillets across bar popouts, launcher, dashboard, and utilities.
+         FilletBlur {
+-            active: (bar.position === "bottom" || bar.position === "top") && popoutBg.shown && !panels.popouts.isDetached && panels.popoutsWrapper.width > 0 && panels.popoutsWrapper.height > 4
++            active: (panels.popoutsWrapper.attachedBottom || panels.popoutsWrapper.attachedTop) && popoutBg.shown && !panels.popouts.isDetached && panels.popoutsWrapper.width > 0 && panels.popoutsWrapper.height > 4
+             leftEdge: Math.round(panels.popoutsWrapper.x + panels.leftMargin)
+             rightEdge: Math.round(panels.popoutsWrapper.x + panels.leftMargin + panels.popoutsWrapper.width)
+-            anchorY: bar.position === "bottom" ? Math.round(root.height - Math.max(bar.implicitHeight, root.borderThickness)) : Math.round(Math.max(bar.implicitHeight, root.borderThickness))
+-            direction: bar.position === "bottom" ? -1 : 1
++            anchorY: panels.popoutsWrapper.attachedBottom ? Math.round(root.height - Math.max(bar.position === "bottom" ? bar.implicitHeight : 0, root.borderThickness)) : Math.round(Math.max(bar.position === "top" ? bar.implicitHeight : 0, root.borderThickness))
++            direction: panels.popoutsWrapper.attachedBottom ? -1 : 1
+             maxExtent: panels.popoutsWrapper.height
+-            leftOpen: leftEdge > root.borderThickness + 2
+-            rightOpen: !popoutBg.connectedToSidebar && (rightEdge < root.width - root.borderThickness - 2)
++            leftOpen: !panels.popoutsWrapper.attachedLeft && leftEdge > root.borderThickness + 2
++            rightOpen: !panels.popoutsWrapper.attachedRight && !popoutBg.connectedToSidebar && (rightEdge < root.width - root.borderThickness - 2)
+         }
+         FilletBlur {
+             active: panels.launcher.visible && panels.launcher.width > 0 && panels.launcher.height > 4
+@@ -1156,7 +1156,7 @@ StyledWindow {
+             direction: bar.position === "bottom" ? 1 : -1
+             maxExtent: panels.utilities.height
+             offsetScale: panels.utilities.offsetScale
+-            deformMatrix: utilitiesBg.deformMatrix
++            deformMatrix: utilsBg.deformMatrix
+             leftOpen: leftEdge > root.borderThickness + 2
+             rightOpen: rightEdge < root.width - root.borderThickness - 2
+         }
+@@ -1184,13 +1184,71 @@ StyledWindow {
+             leftOpen: bar.position !== "right" && leftEdge > root.borderThickness + 2
+             rightOpen: bar.position === "right" && rightEdge < root.width - root.borderThickness - 2
+         }
++        FilletBlur {
++            vertical: true
++            active: panels.osdWrapper.visible && panels.osdWrapper.width > 4 && panels.osdWrapper.height > 0
++            leftEdge: Math.round(panels.osdWrapper.y + panels.topMargin)
++            rightEdge: Math.round(panels.osdWrapper.y + panels.topMargin + panels.osdWrapper.height)
++            anchorY: bar.position === "right"
++                ? Math.round(panels.osdWrapper.x + panels.leftMargin)
++                : Math.round(panels.osdWrapper.x + panels.leftMargin + panels.osdWrapper.width)
++            direction: bar.position === "right" ? 1 : -1
++            maxExtent: panels.osdWrapper.width
++            offsetScale: panels.osd.offsetScale
++            deformMatrix: osdBg.deformMatrix
++            leftOpen: leftEdge > root.borderThickness + 2
++            rightOpen: rightEdge < root.height - root.borderThickness - 2
++        }
++        FilletBlur {
++            vertical: true
++            active: panels.sessionWrapper.visible && panels.sessionWrapper.width > 4 && panels.sessionWrapper.height > 0
++            leftEdge: Math.round(panels.sessionWrapper.y + panels.topMargin)
++            rightEdge: Math.round(panels.sessionWrapper.y + panels.topMargin + panels.sessionWrapper.height)
++            anchorY: bar.position === "right"
++                ? Math.round(panels.sessionWrapper.x + panels.leftMargin)
++                : Math.round(panels.sessionWrapper.x + panels.leftMargin + panels.sessionWrapper.width)
++            direction: bar.position === "right" ? 1 : -1
++            maxExtent: panels.sessionWrapper.width
++            offsetScale: panels.session.offsetScale
++            deformMatrix: sessionBg.deformMatrix
++            leftOpen: leftEdge > root.borderThickness + 2
++            rightOpen: rightEdge < root.height - root.borderThickness - 2
++        }
++        FilletBlur {
++            vertical: true
++            active: panels.utilities.visible && !panels.sidebar.visible && panels.utilities.width > 4 && panels.utilities.height > 0
++            leftEdge: Math.round(panels.utilities.y + panels.topMargin)
++            rightEdge: Math.round(panels.utilities.y + panels.topMargin + panels.utilities.height)
++            anchorY: bar.position === "right"
++                ? Math.round(root.borderThickness)
++                : Math.round(root.width - root.borderThickness)
++            direction: bar.position === "right" ? 1 : -1
++            maxExtent: panels.utilities.width
++            offsetScale: panels.utilities.offsetScale
++            deformMatrix: utilsBg.deformMatrix
++            leftOpen: bar.position !== "bottom" && leftEdge > root.borderThickness + 2
++            rightOpen: bar.position === "bottom" && rightEdge < root.height - root.borderThickness - 2
++        }
++        FilletBlur {
++            vertical: true
++            active: (panels.popoutsWrapper.attachedLeft || panels.popoutsWrapper.attachedRight) && popoutBg.shown && !panels.popouts.isDetached && panels.popoutsWrapper.width > 4 && panels.popoutsWrapper.height > 0
++            leftEdge: Math.round(panels.popoutsWrapper.y + panels.topMargin)
++            rightEdge: Math.round(panels.popoutsWrapper.y + panels.topMargin + panels.popoutsWrapper.height)
++            anchorY: panels.popoutsWrapper.attachedRight
++                ? Math.round(root.width - Math.max(bar.position === "right" ? bar.implicitWidth : 0, root.borderThickness))
++                : Math.round(Math.max(bar.position === "left" ? bar.implicitWidth : 0, root.borderThickness))
++            direction: panels.popoutsWrapper.attachedRight ? -1 : 1
++            maxExtent: panels.popoutsWrapper.width
++            leftOpen: !panels.popoutsWrapper.attachedTop && leftEdge > root.borderThickness + 2 && !(bar.position === "bottom" && popoutBg.connectedToSidebar)
++            rightOpen: !panels.popoutsWrapper.attachedBottom && rightEdge < root.height - root.borderThickness - 2 && !(bar.position === "top" && popoutBg.connectedToSidebar)
++        }
+         BlurMask {
+             target: panels.utilities
+             contentItem: root.contentItem
+             blurOffsetTop: root.blurOffsetTop - (bar.position === "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             blurOffsetBottom: root.blurOffsetBottom - (bar.position !== "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
++            blurOffsetRight: root.blurOffsetRight - (bar.position !== "right" && !GlobalConfig.appearance.islands ? Tokens.padding.small : 0)
+             vAnchor: panels.utilities.vAnchor
+             hAnchor: panels.utilities.hAnchor
+             offsetScale: panels.utilities.offsetScale
+diff --git a/shell/modules/drawers/Panels.qml b/shell/modules/drawers/Panels.qml
+index 3d147729..0d352e3f 100644
+--- a/shell/modules/drawers/Panels.qml
++++ b/shell/modules/drawers/Panels.qml
+@@ -337,8 +337,12 @@ Item {
+     BarPopouts.ClipWrapper {
+         id: popoutsWrapper
+ 
+-        property string vAnchor: (activePanel.position === "top" || activePanel.position === "bottom") ? activePanel.position : "none"
+-        property string hAnchor: (activePanel.position === "left" || activePanel.position === "right") ? activePanel.position : "none"
++        readonly property bool attachedLeft: !content.isDetached && (activePanel.position === "left" || (activePanel.isHorizontal && !activePanel.isIsland && x <= Config.border.smoothing))
++        readonly property bool attachedRight: !content.isDetached && (activePanel.position === "right" || (activePanel.isHorizontal && !activePanel.isIsland && x + width >= root.width - Config.border.smoothing))
++        readonly property bool attachedTop: !content.isDetached && (activePanel.position === "top" || (!activePanel.isHorizontal && !activePanel.isIsland && y <= Config.border.smoothing))
++        readonly property bool attachedBottom: !content.isDetached && (activePanel.position === "bottom" || (!activePanel.isHorizontal && !activePanel.isIsland && y + height >= root.height - Config.border.smoothing))
++        property string vAnchor: attachedTop && attachedBottom ? "both" : (attachedTop ? "top" : (attachedBottom ? "bottom" : "none"))
++        property string hAnchor: attachedLeft && attachedRight ? "both" : (attachedLeft ? "left" : (attachedRight ? "right" : "none"))
+ 
+         backed: root.popoutCoversNotifications
+         screen: root.screen
+diff --git a/shell/modules/drawers/blur/BlurOffsets.qml b/shell/modules/drawers/blur/BlurOffsets.qml
+index cff4710d..ed4bcd83 100644
+--- a/shell/modules/drawers/blur/BlurOffsets.qml
++++ b/shell/modules/drawers/blur/BlurOffsets.qml
+@@ -26,10 +26,10 @@ Item {
+     property matrix4x4 deformMatrix
+     property real radius: (target && target["radius"] !== undefined) ? target["radius"] : Surface.panelRounding
+     property real animScale: 1 - offsetScale
+-    property real sTop: (vAnchor === "top" ? blurOffsetBottom : blurOffsetTop) * animScale
+-    property real sBottom: (vAnchor === "top" ? blurOffsetTop : blurOffsetBottom) * animScale
+-    property real sLeft: (hAnchor === "left" ? blurOffsetRight : blurOffsetLeft) * animScale
+-    property real sRight: (hAnchor === "left" ? blurOffsetLeft : blurOffsetRight) * animScale
++    property real sTop: blurOffsetTop * animScale
++    property real sBottom: blurOffsetBottom * animScale
++    property real sLeft: blurOffsetLeft * animScale
++    property real sRight: blurOffsetRight * animScale
+     property real tX: {
+         if (!target) return 0;
+         let _ = target.x + target.width;
+diff --git a/shell/modules/drawers/blur/FilletBlur.qml b/shell/modules/drawers/blur/FilletBlur.qml
+index 4407fac2..3e610fb1 100644
+--- a/shell/modules/drawers/blur/FilletBlur.qml
++++ b/shell/modules/drawers/blur/FilletBlur.qml
+@@ -14,6 +14,7 @@ Region {
+     // -1 for bottom-anchored panels (fillet extends upward from anchorY),
+     // +1 for top-anchored panels (fillet extends downward from anchorY).
+     property int direction: -1
++    property bool vertical: false
+     property real maxExtent: 1000
+     property real offsetScale: 0
+     property matrix4x4 deformMatrix
+@@ -21,9 +22,11 @@ Region {
+     property bool rightOpen: true
+ 
+     readonly property real animScale: Math.max(0, Math.min(1, 1 - offsetScale))
+-    readonly property real dm11: (deformMatrix.m11 > 0) ? deformMatrix.m11 : 1
++    readonly property real dm: vertical
++        ? ((deformMatrix.m22 > 0) ? deformMatrix.m22 : 1)
++        : ((deformMatrix.m11 > 0) ? deformMatrix.m11 : 1)
+     readonly property real halfW: (rightEdge - leftEdge) / 2
+-    readonly property real deformInset: halfW * (1 - dm11)
++    readonly property real deformInset: halfW * (1 - dm)
+     readonly property real effLeft: Math.round(leftEdge + deformInset)
+     readonly property real effRight: Math.round(rightEdge - deformInset)
+ 
+@@ -56,47 +59,87 @@ Region {
+             : Math.max(0, Math.ceil(anchorY + k * (idx + 1) / 20.0) - sy(idx));
+     }
+ 
+-    // Left circular smin fillet (20 slices = 1px/row at smoothing=20)
+-    Region { x: root.effLeft - root.w(0); y: root.sy(0); width: root.leftOpen && root.w(0) > 0 ? root.w(0) + 1 : 0; height: root.leftOpen ? root.sh(0) : 0 }
+-    Region { x: root.effLeft - root.w(1); y: root.sy(1); width: root.leftOpen && root.w(1) > 0 ? root.w(1) + 1 : 0; height: root.leftOpen ? root.sh(1) : 0 }
+-    Region { x: root.effLeft - root.w(2); y: root.sy(2); width: root.leftOpen && root.w(2) > 0 ? root.w(2) + 1 : 0; height: root.leftOpen ? root.sh(2) : 0 }
+-    Region { x: root.effLeft - root.w(3); y: root.sy(3); width: root.leftOpen && root.w(3) > 0 ? root.w(3) + 1 : 0; height: root.leftOpen ? root.sh(3) : 0 }
+-    Region { x: root.effLeft - root.w(4); y: root.sy(4); width: root.leftOpen && root.w(4) > 0 ? root.w(4) + 1 : 0; height: root.leftOpen ? root.sh(4) : 0 }
+-    Region { x: root.effLeft - root.w(5); y: root.sy(5); width: root.leftOpen && root.w(5) > 0 ? root.w(5) + 1 : 0; height: root.leftOpen ? root.sh(5) : 0 }
+-    Region { x: root.effLeft - root.w(6); y: root.sy(6); width: root.leftOpen && root.w(6) > 0 ? root.w(6) + 1 : 0; height: root.leftOpen ? root.sh(6) : 0 }
+-    Region { x: root.effLeft - root.w(7); y: root.sy(7); width: root.leftOpen && root.w(7) > 0 ? root.w(7) + 1 : 0; height: root.leftOpen ? root.sh(7) : 0 }
+-    Region { x: root.effLeft - root.w(8); y: root.sy(8); width: root.leftOpen && root.w(8) > 0 ? root.w(8) + 1 : 0; height: root.leftOpen ? root.sh(8) : 0 }
+-    Region { x: root.effLeft - root.w(9); y: root.sy(9); width: root.leftOpen && root.w(9) > 0 ? root.w(9) + 1 : 0; height: root.leftOpen ? root.sh(9) : 0 }
+-    Region { x: root.effLeft - root.w(10); y: root.sy(10); width: root.leftOpen && root.w(10) > 0 ? root.w(10) + 1 : 0; height: root.leftOpen ? root.sh(10) : 0 }
+-    Region { x: root.effLeft - root.w(11); y: root.sy(11); width: root.leftOpen && root.w(11) > 0 ? root.w(11) + 1 : 0; height: root.leftOpen ? root.sh(11) : 0 }
+-    Region { x: root.effLeft - root.w(12); y: root.sy(12); width: root.leftOpen && root.w(12) > 0 ? root.w(12) + 1 : 0; height: root.leftOpen ? root.sh(12) : 0 }
+-    Region { x: root.effLeft - root.w(13); y: root.sy(13); width: root.leftOpen && root.w(13) > 0 ? root.w(13) + 1 : 0; height: root.leftOpen ? root.sh(13) : 0 }
+-    Region { x: root.effLeft - root.w(14); y: root.sy(14); width: root.leftOpen && root.w(14) > 0 ? root.w(14) + 1 : 0; height: root.leftOpen ? root.sh(14) : 0 }
+-    Region { x: root.effLeft - root.w(15); y: root.sy(15); width: root.leftOpen && root.w(15) > 0 ? root.w(15) + 1 : 0; height: root.leftOpen ? root.sh(15) : 0 }
+-    Region { x: root.effLeft - root.w(16); y: root.sy(16); width: root.leftOpen && root.w(16) > 0 ? root.w(16) + 1 : 0; height: root.leftOpen ? root.sh(16) : 0 }
+-    Region { x: root.effLeft - root.w(17); y: root.sy(17); width: root.leftOpen && root.w(17) > 0 ? root.w(17) + 1 : 0; height: root.leftOpen ? root.sh(17) : 0 }
+-    Region { x: root.effLeft - root.w(18); y: root.sy(18); width: root.leftOpen && root.w(18) > 0 ? root.w(18) + 1 : 0; height: root.leftOpen ? root.sh(18) : 0 }
+-    Region { x: root.effLeft - root.w(19); y: root.sy(19); width: root.leftOpen && root.w(19) > 0 ? root.w(19) + 1 : 0; height: root.leftOpen ? root.sh(19) : 0 }
+-
+-    // Right circular smin fillet (20 slices = 1px/row at smoothing=20)
+-    Region { x: root.effRight - 1; y: root.sy(0); width: root.rightOpen && root.w(0) > 0 ? root.w(0) + 1 : 0; height: root.rightOpen ? root.sh(0) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(1); width: root.rightOpen && root.w(1) > 0 ? root.w(1) + 1 : 0; height: root.rightOpen ? root.sh(1) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(2); width: root.rightOpen && root.w(2) > 0 ? root.w(2) + 1 : 0; height: root.rightOpen ? root.sh(2) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(3); width: root.rightOpen && root.w(3) > 0 ? root.w(3) + 1 : 0; height: root.rightOpen ? root.sh(3) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(4); width: root.rightOpen && root.w(4) > 0 ? root.w(4) + 1 : 0; height: root.rightOpen ? root.sh(4) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(5); width: root.rightOpen && root.w(5) > 0 ? root.w(5) + 1 : 0; height: root.rightOpen ? root.sh(5) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(6); width: root.rightOpen && root.w(6) > 0 ? root.w(6) + 1 : 0; height: root.rightOpen ? root.sh(6) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(7); width: root.rightOpen && root.w(7) > 0 ? root.w(7) + 1 : 0; height: root.rightOpen ? root.sh(7) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(8); width: root.rightOpen && root.w(8) > 0 ? root.w(8) + 1 : 0; height: root.rightOpen ? root.sh(8) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(9); width: root.rightOpen && root.w(9) > 0 ? root.w(9) + 1 : 0; height: root.rightOpen ? root.sh(9) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(10); width: root.rightOpen && root.w(10) > 0 ? root.w(10) + 1 : 0; height: root.rightOpen ? root.sh(10) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(11); width: root.rightOpen && root.w(11) > 0 ? root.w(11) + 1 : 0; height: root.rightOpen ? root.sh(11) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(12); width: root.rightOpen && root.w(12) > 0 ? root.w(12) + 1 : 0; height: root.rightOpen ? root.sh(12) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(13); width: root.rightOpen && root.w(13) > 0 ? root.w(13) + 1 : 0; height: root.rightOpen ? root.sh(13) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(14); width: root.rightOpen && root.w(14) > 0 ? root.w(14) + 1 : 0; height: root.rightOpen ? root.sh(14) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(15); width: root.rightOpen && root.w(15) > 0 ? root.w(15) + 1 : 0; height: root.rightOpen ? root.sh(15) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(16); width: root.rightOpen && root.w(16) > 0 ? root.w(16) + 1 : 0; height: root.rightOpen ? root.sh(16) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(17); width: root.rightOpen && root.w(17) > 0 ? root.w(17) + 1 : 0; height: root.rightOpen ? root.sh(17) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(18); width: root.rightOpen && root.w(18) > 0 ? root.w(18) + 1 : 0; height: root.rightOpen ? root.sh(18) : 0 }
+-    Region { x: root.effRight - 1; y: root.sy(19); width: root.rightOpen && root.w(19) > 0 ? root.w(19) + 1 : 0; height: root.rightOpen ? root.sh(19) : 0 }
++    function lx(idx: int): int {
++        return vertical ? sy(idx) : effLeft - w(idx);
++    }
++
++    function ly(idx: int): int {
++        return vertical ? effLeft - w(idx) : sy(idx);
++    }
++
++    function lw(idx: int): int {
++        if (!leftOpen || w(idx) <= 0)
++            return 0;
++        return vertical ? sh(idx) : w(idx) + 1;
++    }
++
++    function lh(idx: int): int {
++        if (!leftOpen || w(idx) <= 0)
++            return 0;
++        return vertical ? w(idx) + 1 : sh(idx);
++    }
++
++    function rx(idx: int): int {
++        return vertical ? sy(idx) : effRight - 1;
++    }
++
++    function ry(idx: int): int {
++        return vertical ? effRight - 1 : sy(idx);
++    }
++
++    function rw(idx: int): int {
++        if (!rightOpen || w(idx) <= 0)
++            return 0;
++        return vertical ? sh(idx) : w(idx) + 1;
++    }
++
++    function rh(idx: int): int {
++        if (!rightOpen || w(idx) <= 0)
++            return 0;
++        return vertical ? w(idx) + 1 : sh(idx);
++    }
++
++    // First circular smin fillet (left or top; 20 slices = 1px/row at smoothing=20)
++    Region { x: root.lx(0); y: root.ly(0); width: root.lw(0); height: root.lh(0) }
++    Region { x: root.lx(1); y: root.ly(1); width: root.lw(1); height: root.lh(1) }
++    Region { x: root.lx(2); y: root.ly(2); width: root.lw(2); height: root.lh(2) }
++    Region { x: root.lx(3); y: root.ly(3); width: root.lw(3); height: root.lh(3) }
++    Region { x: root.lx(4); y: root.ly(4); width: root.lw(4); height: root.lh(4) }
++    Region { x: root.lx(5); y: root.ly(5); width: root.lw(5); height: root.lh(5) }
++    Region { x: root.lx(6); y: root.ly(6); width: root.lw(6); height: root.lh(6) }
++    Region { x: root.lx(7); y: root.ly(7); width: root.lw(7); height: root.lh(7) }
++    Region { x: root.lx(8); y: root.ly(8); width: root.lw(8); height: root.lh(8) }
++    Region { x: root.lx(9); y: root.ly(9); width: root.lw(9); height: root.lh(9) }
++    Region { x: root.lx(10); y: root.ly(10); width: root.lw(10); height: root.lh(10) }
++    Region { x: root.lx(11); y: root.ly(11); width: root.lw(11); height: root.lh(11) }
++    Region { x: root.lx(12); y: root.ly(12); width: root.lw(12); height: root.lh(12) }
++    Region { x: root.lx(13); y: root.ly(13); width: root.lw(13); height: root.lh(13) }
++    Region { x: root.lx(14); y: root.ly(14); width: root.lw(14); height: root.lh(14) }
++    Region { x: root.lx(15); y: root.ly(15); width: root.lw(15); height: root.lh(15) }
++    Region { x: root.lx(16); y: root.ly(16); width: root.lw(16); height: root.lh(16) }
++    Region { x: root.lx(17); y: root.ly(17); width: root.lw(17); height: root.lh(17) }
++    Region { x: root.lx(18); y: root.ly(18); width: root.lw(18); height: root.lh(18) }
++    Region { x: root.lx(19); y: root.ly(19); width: root.lw(19); height: root.lh(19) }
++
++    // Second circular smin fillet (right or bottom; 20 slices = 1px/row at smoothing=20)
++    Region { x: root.rx(0); y: root.ry(0); width: root.rw(0); height: root.rh(0) }
++    Region { x: root.rx(1); y: root.ry(1); width: root.rw(1); height: root.rh(1) }
++    Region { x: root.rx(2); y: root.ry(2); width: root.rw(2); height: root.rh(2) }
++    Region { x: root.rx(3); y: root.ry(3); width: root.rw(3); height: root.rh(3) }
++    Region { x: root.rx(4); y: root.ry(4); width: root.rw(4); height: root.rh(4) }
++    Region { x: root.rx(5); y: root.ry(5); width: root.rw(5); height: root.rh(5) }
++    Region { x: root.rx(6); y: root.ry(6); width: root.rw(6); height: root.rh(6) }
++    Region { x: root.rx(7); y: root.ry(7); width: root.rw(7); height: root.rh(7) }
++    Region { x: root.rx(8); y: root.ry(8); width: root.rw(8); height: root.rh(8) }
++    Region { x: root.rx(9); y: root.ry(9); width: root.rw(9); height: root.rh(9) }
++    Region { x: root.rx(10); y: root.ry(10); width: root.rw(10); height: root.rh(10) }
++    Region { x: root.rx(11); y: root.ry(11); width: root.rw(11); height: root.rh(11) }
++    Region { x: root.rx(12); y: root.ry(12); width: root.rw(12); height: root.rh(12) }
++    Region { x: root.rx(13); y: root.ry(13); width: root.rw(13); height: root.rh(13) }
++    Region { x: root.rx(14); y: root.ry(14); width: root.rw(14); height: root.rh(14) }
++    Region { x: root.rx(15); y: root.ry(15); width: root.rw(15); height: root.rh(15) }
++    Region { x: root.rx(16); y: root.ry(16); width: root.rw(16); height: root.rh(16) }
++    Region { x: root.rx(17); y: root.ry(17); width: root.rw(17); height: root.rh(17) }
++    Region { x: root.rx(18); y: root.ry(18); width: root.rw(18); height: root.rh(18) }
++    Region { x: root.rx(19); y: root.ry(19); width: root.rw(19); height: root.rh(19) }
+ }
+-- 
+2.56.1
+

@@ -1,0 +1,531 @@
+From dc501511da82e680b9c113b3c64f60fef4811bf2 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 23 Nov 2026 22:16:20 +0700
+Subject: [PATCH 45/47] feat(ui): add toast blur masks, slider row layout, and
+ blur/window updates
+
+---
+ shell/components/controls/SliderRow.qml    |  43 +++--
+ shell/modules/drawers/ContentWindow.qml    |  22 +++
+ shell/modules/drawers/blur/BlurCorners.qml | 212 ++++++++++-----------
+ shell/modules/drawers/blur/BlurOffsets.qml |  30 ++-
+ shell/modules/nexus/WindowFactory.qml      |  35 +++-
+ shell/modules/utilities/toasts/Toasts.qml  |  14 ++
+ 6 files changed, 224 insertions(+), 132 deletions(-)
+
+diff --git a/shell/components/controls/SliderRow.qml b/shell/components/controls/SliderRow.qml
+index 6c242175..23e24b59 100644
+--- a/shell/components/controls/SliderRow.qml
++++ b/shell/components/controls/SliderRow.qml
+@@ -11,7 +11,7 @@ import qs.modules.nexus.common
+ StyledRect {
+     id: root
+ 
+-    property alias icon: icon.text
++    property string icon
+     property alias label: label.text
+     property alias valueLabel: valueLabel.text
+     property string subtext
+@@ -46,7 +46,7 @@ StyledRect {
+     }
+ 
+     Layout.fillWidth: true
+-    implicitHeight: rowLayout.implicitHeight + rowLayout.anchors.margins + rowLayout.anchors.topMargin
++    implicitHeight: rowLayout.implicitHeight + rowLayout.anchors.topMargin + rowLayout.anchors.bottomMargin
+     color: isSelected ? Colours.layer(Colours.palette.m3surfaceContainerHigh, 4) : Colours.tPalette.m3surfaceContainer
+     border.width: isSelected ? 2 : 0
+     border.color: Colours.palette.m3primary
+@@ -76,32 +76,35 @@ StyledRect {
+         id: rowLayout
+ 
+         anchors.fill: parent
+-        anchors.margins: spacious ? Tokens.padding.largeIncreased : Tokens.padding.medium
+-        anchors.topMargin: spacious ? Tokens.padding.large : Tokens.padding.small
+-        // Keep the same right inset as ToggleRow/StepperRow (12px) even when
+-        // spacious, so reset icons line up in one column across every row type.
++        anchors.leftMargin: spacious ? Tokens.padding.largeIncreased : Tokens.padding.medium
+         anchors.rightMargin: Tokens.padding.medium
+-        spacing: spacious ? Tokens.spacing.medium : Tokens.spacing.small
++        anchors.topMargin: spacious ? Tokens.padding.large : Tokens.padding.medium
++        anchors.bottomMargin: spacious ? Tokens.padding.largeIncreased : Tokens.padding.small
++        spacing: Tokens.spacing.medium
++
++        IconButton {
++            visible: root.icon !== "" && root.iconClickable
++            Layout.alignment: Qt.AlignVCenter
++            icon: root.icon
++            type: IconButton.Tonal
++            isRound: true
++            enabled: root.enabled
++            onClicked: root.iconClicked()
++        }
+ 
+         MaterialIcon {
+             id: icon
+ 
+-            visible: text !== ""
++            visible: root.icon !== "" && !root.iconClickable
++            Layout.alignment: Qt.AlignVCenter
++            text: root.icon
+             color: root.enabled ? Colours.palette.m3onSurfaceVariant : Colours.disabledContent
+-            fontStyle: spacious ? Tokens.font.icon.medium : Tokens.font.icon.small
+-
+-            MouseArea {
+-                anchors.fill: parent
+-                anchors.margins: -6
+-                enabled: root.iconClickable
+-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+-                onClicked: root.iconClicked()
+-            }
++            fontStyle: Tokens.font.icon.medium
+         }
+ 
+         ColumnLayout {
+             Layout.fillWidth: true
+-            spacing: spacious ? Tokens.spacing.medium : Tokens.spacing.extraSmall
++            spacing: spacious ? Tokens.spacing.medium : Tokens.spacing.small
+ 
+             RowLayout {
+                 Layout.fillWidth: true
+@@ -154,13 +157,13 @@ StyledRect {
+                 }
+ 
+                 Layout.fillWidth: true
+-                implicitHeight: spacious ? Tokens.padding.medium * 2 : Tokens.padding.large
++                implicitHeight: root.spacious ? Tokens.padding.medium * 2 + Tokens.padding.small : Tokens.padding.large * 2
+ 
+                 StyledSlider {
+                     anchors.left: parent.left
+                     anchors.right: parent.right
+                     anchors.verticalCenter: parent.verticalCenter
+-                    implicitHeight: parent.implicitHeight
++                    implicitHeight: root.spacious ? Tokens.padding.medium * 2 : Tokens.padding.large
+ 
+                     radius: Tokens.rounding.small
+                     value: root.value
+diff --git a/shell/modules/drawers/ContentWindow.qml b/shell/modules/drawers/ContentWindow.qml
+index 497a6f6d..51d9d852 100644
+--- a/shell/modules/drawers/ContentWindow.qml
++++ b/shell/modules/drawers/ContentWindow.qml
+@@ -1325,6 +1325,28 @@ StyledWindow {
+             hAnchor: "none"
+             offsetScale: panels.floatingOsd.offsetScale
+         }
++        ToastBlurMask { toastIndex: 0 }
++        ToastBlurMask { toastIndex: 1 }
++        ToastBlurMask { toastIndex: 2 }
++        ToastBlurMask { toastIndex: 3 }
++        ToastBlurMask { toastIndex: 4 }
++        ToastBlurMask { toastIndex: 5 }
++    }
++
++    component ToastBlurMask: BlurMask {
++        required property int toastIndex
++
++        readonly property Item toastItem: (panels.toasts.visible && GlobalConfig.utilities.toasts.transparency && !(GameMode.enabled && GlobalConfig.utilities.gameMode.disableToastTransparency) && toastIndex < panels.toasts.toastItems.length) ? panels.toasts.toastItems[toastIndex] : null
++
++        target: (toastItem && toastItem.opacity > 0.01) ? toastItem : null
++        contentItem: root.contentItem
++        blurOffsetTop: root.blurOffsetTop
++        blurOffsetBottom: root.blurOffsetBottom
++        blurOffsetLeft: root.blurOffsetLeft
++        blurOffsetRight: root.blurOffsetRight
++        vAnchor: "none"
++        hAnchor: "none"
++        radius: toastItem ? toastItem.radius : Tokens.rounding.large
+     }
+ 
+     // Drawn last so the drag ghost passes over the bar and the box it is heading for
+diff --git a/shell/modules/drawers/blur/BlurCorners.qml b/shell/modules/drawers/blur/BlurCorners.qml
+index 8f499ff7..29c6e912 100644
+--- a/shell/modules/drawers/blur/BlurCorners.qml
++++ b/shell/modules/drawers/blur/BlurCorners.qml
+@@ -17,7 +17,7 @@ Region {
+     required property real rLeft
+     required property real rRight
+ 
+-    property int steps: Math.max(1, blurQuality)
++    property int steps: Math.min(100, Math.max(1, blurQuality, Math.ceil(Math.max(rTL, rTR, rBL, rBR))))
+ 
+     // The strip geometry depends only on steps, so it is computed once here
+     // instead of in every region binding on every animation frame.
+@@ -29,11 +29,11 @@ Region {
+             const prev = Math.ceil((i - 1) * steps / 100);
+             active.push(m > prev && (root.intersection === Intersection.Subtract || m < steps));
+             yo.push(m / steps);
+-            // Use inscribed steps (m/steps) for additive blur masks so 1-bit blur rectangles
+-            // never poke outside the anti-aliased rounded corner; keep circumscribed steps
+-            // (prev/steps) when subtracting concave screen corners.
+-            const edge = root.intersection === Intersection.Subtract ? (prev / steps) : (m / steps);
+-            xVal.push(Math.sqrt(1 - Math.pow(edge, 2)));
++            // Sample at the vertical midpoint of each 1px strip for additive blur masks so the
++            // rounded corner closely follows the anti-aliased arc without jagged inset steps;
++            // keep circumscribed steps (prev/steps) when subtracting concave screen corners.
++            const edge = root.intersection === Intersection.Subtract ? (prev / steps) : ((m - 0.5) / steps);
++            xVal.push(Math.sqrt(Math.max(0, 1 - Math.pow(edge, 2))));
+         }
+         return { active, yo, xVal };
+     }
+@@ -272,106 +272,106 @@ Region {
+     Region { x: isActiveTR(99) ? inRight + trX : 0; y: isActiveTR(99) ? inTop - rTR * getYo(99) + trY : 0; width: isActiveTR(99) ? rTR * getXVal(99) + trW : 0; height: isActiveTR(99) ? rTR * getYo(99) + trH : 0 }
+     Region { x: isActiveTR(100) ? inRight + trX : 0; y: isActiveTR(100) ? inTop - rTR * getYo(100) + trY : 0; width: isActiveTR(100) ? rTR * getXVal(100) + trW : 0; height: isActiveTR(100) ? rTR * getYo(100) + trH : 0 }
+ 
+-    Region { x: isActiveBL(1) ? inLeft - rBL * getXVal(1) + 1 + blX : 0; y: isActiveBL(1) ? inBottom + blY : 0; width: isActiveBL(1) ? rBL * getXVal(1) + blW : 0; height: isActiveBL(1) ? rBL * getYo(1) + blH : 0 }
+-    Region { x: isActiveBL(2) ? inLeft - rBL * getXVal(2) + 1 + blX : 0; y: isActiveBL(2) ? inBottom + blY : 0; width: isActiveBL(2) ? rBL * getXVal(2) + blW : 0; height: isActiveBL(2) ? rBL * getYo(2) + blH : 0 }
+-    Region { x: isActiveBL(3) ? inLeft - rBL * getXVal(3) + 1 + blX : 0; y: isActiveBL(3) ? inBottom + blY : 0; width: isActiveBL(3) ? rBL * getXVal(3) + blW : 0; height: isActiveBL(3) ? rBL * getYo(3) + blH : 0 }
+-    Region { x: isActiveBL(4) ? inLeft - rBL * getXVal(4) + 1 + blX : 0; y: isActiveBL(4) ? inBottom + blY : 0; width: isActiveBL(4) ? rBL * getXVal(4) + blW : 0; height: isActiveBL(4) ? rBL * getYo(4) + blH : 0 }
+-    Region { x: isActiveBL(5) ? inLeft - rBL * getXVal(5) + 1 + blX : 0; y: isActiveBL(5) ? inBottom + blY : 0; width: isActiveBL(5) ? rBL * getXVal(5) + blW : 0; height: isActiveBL(5) ? rBL * getYo(5) + blH : 0 }
+-    Region { x: isActiveBL(6) ? inLeft - rBL * getXVal(6) + 1 + blX : 0; y: isActiveBL(6) ? inBottom + blY : 0; width: isActiveBL(6) ? rBL * getXVal(6) + blW : 0; height: isActiveBL(6) ? rBL * getYo(6) + blH : 0 }
+-    Region { x: isActiveBL(7) ? inLeft - rBL * getXVal(7) + 1 + blX : 0; y: isActiveBL(7) ? inBottom + blY : 0; width: isActiveBL(7) ? rBL * getXVal(7) + blW : 0; height: isActiveBL(7) ? rBL * getYo(7) + blH : 0 }
+-    Region { x: isActiveBL(8) ? inLeft - rBL * getXVal(8) + 1 + blX : 0; y: isActiveBL(8) ? inBottom + blY : 0; width: isActiveBL(8) ? rBL * getXVal(8) + blW : 0; height: isActiveBL(8) ? rBL * getYo(8) + blH : 0 }
+-    Region { x: isActiveBL(9) ? inLeft - rBL * getXVal(9) + 1 + blX : 0; y: isActiveBL(9) ? inBottom + blY : 0; width: isActiveBL(9) ? rBL * getXVal(9) + blW : 0; height: isActiveBL(9) ? rBL * getYo(9) + blH : 0 }
+-    Region { x: isActiveBL(10) ? inLeft - rBL * getXVal(10) + 1 + blX : 0; y: isActiveBL(10) ? inBottom + blY : 0; width: isActiveBL(10) ? rBL * getXVal(10) + blW : 0; height: isActiveBL(10) ? rBL * getYo(10) + blH : 0 }
+-    Region { x: isActiveBL(11) ? inLeft - rBL * getXVal(11) + 1 + blX : 0; y: isActiveBL(11) ? inBottom + blY : 0; width: isActiveBL(11) ? rBL * getXVal(11) + blW : 0; height: isActiveBL(11) ? rBL * getYo(11) + blH : 0 }
+-    Region { x: isActiveBL(12) ? inLeft - rBL * getXVal(12) + 1 + blX : 0; y: isActiveBL(12) ? inBottom + blY : 0; width: isActiveBL(12) ? rBL * getXVal(12) + blW : 0; height: isActiveBL(12) ? rBL * getYo(12) + blH : 0 }
+-    Region { x: isActiveBL(13) ? inLeft - rBL * getXVal(13) + 1 + blX : 0; y: isActiveBL(13) ? inBottom + blY : 0; width: isActiveBL(13) ? rBL * getXVal(13) + blW : 0; height: isActiveBL(13) ? rBL * getYo(13) + blH : 0 }
+-    Region { x: isActiveBL(14) ? inLeft - rBL * getXVal(14) + 1 + blX : 0; y: isActiveBL(14) ? inBottom + blY : 0; width: isActiveBL(14) ? rBL * getXVal(14) + blW : 0; height: isActiveBL(14) ? rBL * getYo(14) + blH : 0 }
+-    Region { x: isActiveBL(15) ? inLeft - rBL * getXVal(15) + 1 + blX : 0; y: isActiveBL(15) ? inBottom + blY : 0; width: isActiveBL(15) ? rBL * getXVal(15) + blW : 0; height: isActiveBL(15) ? rBL * getYo(15) + blH : 0 }
+-    Region { x: isActiveBL(16) ? inLeft - rBL * getXVal(16) + 1 + blX : 0; y: isActiveBL(16) ? inBottom + blY : 0; width: isActiveBL(16) ? rBL * getXVal(16) + blW : 0; height: isActiveBL(16) ? rBL * getYo(16) + blH : 0 }
+-    Region { x: isActiveBL(17) ? inLeft - rBL * getXVal(17) + 1 + blX : 0; y: isActiveBL(17) ? inBottom + blY : 0; width: isActiveBL(17) ? rBL * getXVal(17) + blW : 0; height: isActiveBL(17) ? rBL * getYo(17) + blH : 0 }
+-    Region { x: isActiveBL(18) ? inLeft - rBL * getXVal(18) + 1 + blX : 0; y: isActiveBL(18) ? inBottom + blY : 0; width: isActiveBL(18) ? rBL * getXVal(18) + blW : 0; height: isActiveBL(18) ? rBL * getYo(18) + blH : 0 }
+-    Region { x: isActiveBL(19) ? inLeft - rBL * getXVal(19) + 1 + blX : 0; y: isActiveBL(19) ? inBottom + blY : 0; width: isActiveBL(19) ? rBL * getXVal(19) + blW : 0; height: isActiveBL(19) ? rBL * getYo(19) + blH : 0 }
+-    Region { x: isActiveBL(20) ? inLeft - rBL * getXVal(20) + 1 + blX : 0; y: isActiveBL(20) ? inBottom + blY : 0; width: isActiveBL(20) ? rBL * getXVal(20) + blW : 0; height: isActiveBL(20) ? rBL * getYo(20) + blH : 0 }
+-    Region { x: isActiveBL(21) ? inLeft - rBL * getXVal(21) + 1 + blX : 0; y: isActiveBL(21) ? inBottom + blY : 0; width: isActiveBL(21) ? rBL * getXVal(21) + blW : 0; height: isActiveBL(21) ? rBL * getYo(21) + blH : 0 }
+-    Region { x: isActiveBL(22) ? inLeft - rBL * getXVal(22) + 1 + blX : 0; y: isActiveBL(22) ? inBottom + blY : 0; width: isActiveBL(22) ? rBL * getXVal(22) + blW : 0; height: isActiveBL(22) ? rBL * getYo(22) + blH : 0 }
+-    Region { x: isActiveBL(23) ? inLeft - rBL * getXVal(23) + 1 + blX : 0; y: isActiveBL(23) ? inBottom + blY : 0; width: isActiveBL(23) ? rBL * getXVal(23) + blW : 0; height: isActiveBL(23) ? rBL * getYo(23) + blH : 0 }
+-    Region { x: isActiveBL(24) ? inLeft - rBL * getXVal(24) + 1 + blX : 0; y: isActiveBL(24) ? inBottom + blY : 0; width: isActiveBL(24) ? rBL * getXVal(24) + blW : 0; height: isActiveBL(24) ? rBL * getYo(24) + blH : 0 }
+-    Region { x: isActiveBL(25) ? inLeft - rBL * getXVal(25) + 1 + blX : 0; y: isActiveBL(25) ? inBottom + blY : 0; width: isActiveBL(25) ? rBL * getXVal(25) + blW : 0; height: isActiveBL(25) ? rBL * getYo(25) + blH : 0 }
+-    Region { x: isActiveBL(26) ? inLeft - rBL * getXVal(26) + 1 + blX : 0; y: isActiveBL(26) ? inBottom + blY : 0; width: isActiveBL(26) ? rBL * getXVal(26) + blW : 0; height: isActiveBL(26) ? rBL * getYo(26) + blH : 0 }
+-    Region { x: isActiveBL(27) ? inLeft - rBL * getXVal(27) + 1 + blX : 0; y: isActiveBL(27) ? inBottom + blY : 0; width: isActiveBL(27) ? rBL * getXVal(27) + blW : 0; height: isActiveBL(27) ? rBL * getYo(27) + blH : 0 }
+-    Region { x: isActiveBL(28) ? inLeft - rBL * getXVal(28) + 1 + blX : 0; y: isActiveBL(28) ? inBottom + blY : 0; width: isActiveBL(28) ? rBL * getXVal(28) + blW : 0; height: isActiveBL(28) ? rBL * getYo(28) + blH : 0 }
+-    Region { x: isActiveBL(29) ? inLeft - rBL * getXVal(29) + 1 + blX : 0; y: isActiveBL(29) ? inBottom + blY : 0; width: isActiveBL(29) ? rBL * getXVal(29) + blW : 0; height: isActiveBL(29) ? rBL * getYo(29) + blH : 0 }
+-    Region { x: isActiveBL(30) ? inLeft - rBL * getXVal(30) + 1 + blX : 0; y: isActiveBL(30) ? inBottom + blY : 0; width: isActiveBL(30) ? rBL * getXVal(30) + blW : 0; height: isActiveBL(30) ? rBL * getYo(30) + blH : 0 }
+-    Region { x: isActiveBL(31) ? inLeft - rBL * getXVal(31) + 1 + blX : 0; y: isActiveBL(31) ? inBottom + blY : 0; width: isActiveBL(31) ? rBL * getXVal(31) + blW : 0; height: isActiveBL(31) ? rBL * getYo(31) + blH : 0 }
+-    Region { x: isActiveBL(32) ? inLeft - rBL * getXVal(32) + 1 + blX : 0; y: isActiveBL(32) ? inBottom + blY : 0; width: isActiveBL(32) ? rBL * getXVal(32) + blW : 0; height: isActiveBL(32) ? rBL * getYo(32) + blH : 0 }
+-    Region { x: isActiveBL(33) ? inLeft - rBL * getXVal(33) + 1 + blX : 0; y: isActiveBL(33) ? inBottom + blY : 0; width: isActiveBL(33) ? rBL * getXVal(33) + blW : 0; height: isActiveBL(33) ? rBL * getYo(33) + blH : 0 }
+-    Region { x: isActiveBL(34) ? inLeft - rBL * getXVal(34) + 1 + blX : 0; y: isActiveBL(34) ? inBottom + blY : 0; width: isActiveBL(34) ? rBL * getXVal(34) + blW : 0; height: isActiveBL(34) ? rBL * getYo(34) + blH : 0 }
+-    Region { x: isActiveBL(35) ? inLeft - rBL * getXVal(35) + 1 + blX : 0; y: isActiveBL(35) ? inBottom + blY : 0; width: isActiveBL(35) ? rBL * getXVal(35) + blW : 0; height: isActiveBL(35) ? rBL * getYo(35) + blH : 0 }
+-    Region { x: isActiveBL(36) ? inLeft - rBL * getXVal(36) + 1 + blX : 0; y: isActiveBL(36) ? inBottom + blY : 0; width: isActiveBL(36) ? rBL * getXVal(36) + blW : 0; height: isActiveBL(36) ? rBL * getYo(36) + blH : 0 }
+-    Region { x: isActiveBL(37) ? inLeft - rBL * getXVal(37) + 1 + blX : 0; y: isActiveBL(37) ? inBottom + blY : 0; width: isActiveBL(37) ? rBL * getXVal(37) + blW : 0; height: isActiveBL(37) ? rBL * getYo(37) + blH : 0 }
+-    Region { x: isActiveBL(38) ? inLeft - rBL * getXVal(38) + 1 + blX : 0; y: isActiveBL(38) ? inBottom + blY : 0; width: isActiveBL(38) ? rBL * getXVal(38) + blW : 0; height: isActiveBL(38) ? rBL * getYo(38) + blH : 0 }
+-    Region { x: isActiveBL(39) ? inLeft - rBL * getXVal(39) + 1 + blX : 0; y: isActiveBL(39) ? inBottom + blY : 0; width: isActiveBL(39) ? rBL * getXVal(39) + blW : 0; height: isActiveBL(39) ? rBL * getYo(39) + blH : 0 }
+-    Region { x: isActiveBL(40) ? inLeft - rBL * getXVal(40) + 1 + blX : 0; y: isActiveBL(40) ? inBottom + blY : 0; width: isActiveBL(40) ? rBL * getXVal(40) + blW : 0; height: isActiveBL(40) ? rBL * getYo(40) + blH : 0 }
+-    Region { x: isActiveBL(41) ? inLeft - rBL * getXVal(41) + 1 + blX : 0; y: isActiveBL(41) ? inBottom + blY : 0; width: isActiveBL(41) ? rBL * getXVal(41) + blW : 0; height: isActiveBL(41) ? rBL * getYo(41) + blH : 0 }
+-    Region { x: isActiveBL(42) ? inLeft - rBL * getXVal(42) + 1 + blX : 0; y: isActiveBL(42) ? inBottom + blY : 0; width: isActiveBL(42) ? rBL * getXVal(42) + blW : 0; height: isActiveBL(42) ? rBL * getYo(42) + blH : 0 }
+-    Region { x: isActiveBL(43) ? inLeft - rBL * getXVal(43) + 1 + blX : 0; y: isActiveBL(43) ? inBottom + blY : 0; width: isActiveBL(43) ? rBL * getXVal(43) + blW : 0; height: isActiveBL(43) ? rBL * getYo(43) + blH : 0 }
+-    Region { x: isActiveBL(44) ? inLeft - rBL * getXVal(44) + 1 + blX : 0; y: isActiveBL(44) ? inBottom + blY : 0; width: isActiveBL(44) ? rBL * getXVal(44) + blW : 0; height: isActiveBL(44) ? rBL * getYo(44) + blH : 0 }
+-    Region { x: isActiveBL(45) ? inLeft - rBL * getXVal(45) + 1 + blX : 0; y: isActiveBL(45) ? inBottom + blY : 0; width: isActiveBL(45) ? rBL * getXVal(45) + blW : 0; height: isActiveBL(45) ? rBL * getYo(45) + blH : 0 }
+-    Region { x: isActiveBL(46) ? inLeft - rBL * getXVal(46) + 1 + blX : 0; y: isActiveBL(46) ? inBottom + blY : 0; width: isActiveBL(46) ? rBL * getXVal(46) + blW : 0; height: isActiveBL(46) ? rBL * getYo(46) + blH : 0 }
+-    Region { x: isActiveBL(47) ? inLeft - rBL * getXVal(47) + 1 + blX : 0; y: isActiveBL(47) ? inBottom + blY : 0; width: isActiveBL(47) ? rBL * getXVal(47) + blW : 0; height: isActiveBL(47) ? rBL * getYo(47) + blH : 0 }
+-    Region { x: isActiveBL(48) ? inLeft - rBL * getXVal(48) + 1 + blX : 0; y: isActiveBL(48) ? inBottom + blY : 0; width: isActiveBL(48) ? rBL * getXVal(48) + blW : 0; height: isActiveBL(48) ? rBL * getYo(48) + blH : 0 }
+-    Region { x: isActiveBL(49) ? inLeft - rBL * getXVal(49) + 1 + blX : 0; y: isActiveBL(49) ? inBottom + blY : 0; width: isActiveBL(49) ? rBL * getXVal(49) + blW : 0; height: isActiveBL(49) ? rBL * getYo(49) + blH : 0 }
+-    Region { x: isActiveBL(50) ? inLeft - rBL * getXVal(50) + 1 + blX : 0; y: isActiveBL(50) ? inBottom + blY : 0; width: isActiveBL(50) ? rBL * getXVal(50) + blW : 0; height: isActiveBL(50) ? rBL * getYo(50) + blH : 0 }
+-    Region { x: isActiveBL(51) ? inLeft - rBL * getXVal(51) + 1 + blX : 0; y: isActiveBL(51) ? inBottom + blY : 0; width: isActiveBL(51) ? rBL * getXVal(51) + blW : 0; height: isActiveBL(51) ? rBL * getYo(51) + blH : 0 }
+-    Region { x: isActiveBL(52) ? inLeft - rBL * getXVal(52) + 1 + blX : 0; y: isActiveBL(52) ? inBottom + blY : 0; width: isActiveBL(52) ? rBL * getXVal(52) + blW : 0; height: isActiveBL(52) ? rBL * getYo(52) + blH : 0 }
+-    Region { x: isActiveBL(53) ? inLeft - rBL * getXVal(53) + 1 + blX : 0; y: isActiveBL(53) ? inBottom + blY : 0; width: isActiveBL(53) ? rBL * getXVal(53) + blW : 0; height: isActiveBL(53) ? rBL * getYo(53) + blH : 0 }
+-    Region { x: isActiveBL(54) ? inLeft - rBL * getXVal(54) + 1 + blX : 0; y: isActiveBL(54) ? inBottom + blY : 0; width: isActiveBL(54) ? rBL * getXVal(54) + blW : 0; height: isActiveBL(54) ? rBL * getYo(54) + blH : 0 }
+-    Region { x: isActiveBL(55) ? inLeft - rBL * getXVal(55) + 1 + blX : 0; y: isActiveBL(55) ? inBottom + blY : 0; width: isActiveBL(55) ? rBL * getXVal(55) + blW : 0; height: isActiveBL(55) ? rBL * getYo(55) + blH : 0 }
+-    Region { x: isActiveBL(56) ? inLeft - rBL * getXVal(56) + 1 + blX : 0; y: isActiveBL(56) ? inBottom + blY : 0; width: isActiveBL(56) ? rBL * getXVal(56) + blW : 0; height: isActiveBL(56) ? rBL * getYo(56) + blH : 0 }
+-    Region { x: isActiveBL(57) ? inLeft - rBL * getXVal(57) + 1 + blX : 0; y: isActiveBL(57) ? inBottom + blY : 0; width: isActiveBL(57) ? rBL * getXVal(57) + blW : 0; height: isActiveBL(57) ? rBL * getYo(57) + blH : 0 }
+-    Region { x: isActiveBL(58) ? inLeft - rBL * getXVal(58) + 1 + blX : 0; y: isActiveBL(58) ? inBottom + blY : 0; width: isActiveBL(58) ? rBL * getXVal(58) + blW : 0; height: isActiveBL(58) ? rBL * getYo(58) + blH : 0 }
+-    Region { x: isActiveBL(59) ? inLeft - rBL * getXVal(59) + 1 + blX : 0; y: isActiveBL(59) ? inBottom + blY : 0; width: isActiveBL(59) ? rBL * getXVal(59) + blW : 0; height: isActiveBL(59) ? rBL * getYo(59) + blH : 0 }
+-    Region { x: isActiveBL(60) ? inLeft - rBL * getXVal(60) + 1 + blX : 0; y: isActiveBL(60) ? inBottom + blY : 0; width: isActiveBL(60) ? rBL * getXVal(60) + blW : 0; height: isActiveBL(60) ? rBL * getYo(60) + blH : 0 }
+-    Region { x: isActiveBL(61) ? inLeft - rBL * getXVal(61) + 1 + blX : 0; y: isActiveBL(61) ? inBottom + blY : 0; width: isActiveBL(61) ? rBL * getXVal(61) + blW : 0; height: isActiveBL(61) ? rBL * getYo(61) + blH : 0 }
+-    Region { x: isActiveBL(62) ? inLeft - rBL * getXVal(62) + 1 + blX : 0; y: isActiveBL(62) ? inBottom + blY : 0; width: isActiveBL(62) ? rBL * getXVal(62) + blW : 0; height: isActiveBL(62) ? rBL * getYo(62) + blH : 0 }
+-    Region { x: isActiveBL(63) ? inLeft - rBL * getXVal(63) + 1 + blX : 0; y: isActiveBL(63) ? inBottom + blY : 0; width: isActiveBL(63) ? rBL * getXVal(63) + blW : 0; height: isActiveBL(63) ? rBL * getYo(63) + blH : 0 }
+-    Region { x: isActiveBL(64) ? inLeft - rBL * getXVal(64) + 1 + blX : 0; y: isActiveBL(64) ? inBottom + blY : 0; width: isActiveBL(64) ? rBL * getXVal(64) + blW : 0; height: isActiveBL(64) ? rBL * getYo(64) + blH : 0 }
+-    Region { x: isActiveBL(65) ? inLeft - rBL * getXVal(65) + 1 + blX : 0; y: isActiveBL(65) ? inBottom + blY : 0; width: isActiveBL(65) ? rBL * getXVal(65) + blW : 0; height: isActiveBL(65) ? rBL * getYo(65) + blH : 0 }
+-    Region { x: isActiveBL(66) ? inLeft - rBL * getXVal(66) + 1 + blX : 0; y: isActiveBL(66) ? inBottom + blY : 0; width: isActiveBL(66) ? rBL * getXVal(66) + blW : 0; height: isActiveBL(66) ? rBL * getYo(66) + blH : 0 }
+-    Region { x: isActiveBL(67) ? inLeft - rBL * getXVal(67) + 1 + blX : 0; y: isActiveBL(67) ? inBottom + blY : 0; width: isActiveBL(67) ? rBL * getXVal(67) + blW : 0; height: isActiveBL(67) ? rBL * getYo(67) + blH : 0 }
+-    Region { x: isActiveBL(68) ? inLeft - rBL * getXVal(68) + 1 + blX : 0; y: isActiveBL(68) ? inBottom + blY : 0; width: isActiveBL(68) ? rBL * getXVal(68) + blW : 0; height: isActiveBL(68) ? rBL * getYo(68) + blH : 0 }
+-    Region { x: isActiveBL(69) ? inLeft - rBL * getXVal(69) + 1 + blX : 0; y: isActiveBL(69) ? inBottom + blY : 0; width: isActiveBL(69) ? rBL * getXVal(69) + blW : 0; height: isActiveBL(69) ? rBL * getYo(69) + blH : 0 }
+-    Region { x: isActiveBL(70) ? inLeft - rBL * getXVal(70) + 1 + blX : 0; y: isActiveBL(70) ? inBottom + blY : 0; width: isActiveBL(70) ? rBL * getXVal(70) + blW : 0; height: isActiveBL(70) ? rBL * getYo(70) + blH : 0 }
+-    Region { x: isActiveBL(71) ? inLeft - rBL * getXVal(71) + 1 + blX : 0; y: isActiveBL(71) ? inBottom + blY : 0; width: isActiveBL(71) ? rBL * getXVal(71) + blW : 0; height: isActiveBL(71) ? rBL * getYo(71) + blH : 0 }
+-    Region { x: isActiveBL(72) ? inLeft - rBL * getXVal(72) + 1 + blX : 0; y: isActiveBL(72) ? inBottom + blY : 0; width: isActiveBL(72) ? rBL * getXVal(72) + blW : 0; height: isActiveBL(72) ? rBL * getYo(72) + blH : 0 }
+-    Region { x: isActiveBL(73) ? inLeft - rBL * getXVal(73) + 1 + blX : 0; y: isActiveBL(73) ? inBottom + blY : 0; width: isActiveBL(73) ? rBL * getXVal(73) + blW : 0; height: isActiveBL(73) ? rBL * getYo(73) + blH : 0 }
+-    Region { x: isActiveBL(74) ? inLeft - rBL * getXVal(74) + 1 + blX : 0; y: isActiveBL(74) ? inBottom + blY : 0; width: isActiveBL(74) ? rBL * getXVal(74) + blW : 0; height: isActiveBL(74) ? rBL * getYo(74) + blH : 0 }
+-    Region { x: isActiveBL(75) ? inLeft - rBL * getXVal(75) + 1 + blX : 0; y: isActiveBL(75) ? inBottom + blY : 0; width: isActiveBL(75) ? rBL * getXVal(75) + blW : 0; height: isActiveBL(75) ? rBL * getYo(75) + blH : 0 }
+-    Region { x: isActiveBL(76) ? inLeft - rBL * getXVal(76) + 1 + blX : 0; y: isActiveBL(76) ? inBottom + blY : 0; width: isActiveBL(76) ? rBL * getXVal(76) + blW : 0; height: isActiveBL(76) ? rBL * getYo(76) + blH : 0 }
+-    Region { x: isActiveBL(77) ? inLeft - rBL * getXVal(77) + 1 + blX : 0; y: isActiveBL(77) ? inBottom + blY : 0; width: isActiveBL(77) ? rBL * getXVal(77) + blW : 0; height: isActiveBL(77) ? rBL * getYo(77) + blH : 0 }
+-    Region { x: isActiveBL(78) ? inLeft - rBL * getXVal(78) + 1 + blX : 0; y: isActiveBL(78) ? inBottom + blY : 0; width: isActiveBL(78) ? rBL * getXVal(78) + blW : 0; height: isActiveBL(78) ? rBL * getYo(78) + blH : 0 }
+-    Region { x: isActiveBL(79) ? inLeft - rBL * getXVal(79) + 1 + blX : 0; y: isActiveBL(79) ? inBottom + blY : 0; width: isActiveBL(79) ? rBL * getXVal(79) + blW : 0; height: isActiveBL(79) ? rBL * getYo(79) + blH : 0 }
+-    Region { x: isActiveBL(80) ? inLeft - rBL * getXVal(80) + 1 + blX : 0; y: isActiveBL(80) ? inBottom + blY : 0; width: isActiveBL(80) ? rBL * getXVal(80) + blW : 0; height: isActiveBL(80) ? rBL * getYo(80) + blH : 0 }
+-    Region { x: isActiveBL(81) ? inLeft - rBL * getXVal(81) + 1 + blX : 0; y: isActiveBL(81) ? inBottom + blY : 0; width: isActiveBL(81) ? rBL * getXVal(81) + blW : 0; height: isActiveBL(81) ? rBL * getYo(81) + blH : 0 }
+-    Region { x: isActiveBL(82) ? inLeft - rBL * getXVal(82) + 1 + blX : 0; y: isActiveBL(82) ? inBottom + blY : 0; width: isActiveBL(82) ? rBL * getXVal(82) + blW : 0; height: isActiveBL(82) ? rBL * getYo(82) + blH : 0 }
+-    Region { x: isActiveBL(83) ? inLeft - rBL * getXVal(83) + 1 + blX : 0; y: isActiveBL(83) ? inBottom + blY : 0; width: isActiveBL(83) ? rBL * getXVal(83) + blW : 0; height: isActiveBL(83) ? rBL * getYo(83) + blH : 0 }
+-    Region { x: isActiveBL(84) ? inLeft - rBL * getXVal(84) + 1 + blX : 0; y: isActiveBL(84) ? inBottom + blY : 0; width: isActiveBL(84) ? rBL * getXVal(84) + blW : 0; height: isActiveBL(84) ? rBL * getYo(84) + blH : 0 }
+-    Region { x: isActiveBL(85) ? inLeft - rBL * getXVal(85) + 1 + blX : 0; y: isActiveBL(85) ? inBottom + blY : 0; width: isActiveBL(85) ? rBL * getXVal(85) + blW : 0; height: isActiveBL(85) ? rBL * getYo(85) + blH : 0 }
+-    Region { x: isActiveBL(86) ? inLeft - rBL * getXVal(86) + 1 + blX : 0; y: isActiveBL(86) ? inBottom + blY : 0; width: isActiveBL(86) ? rBL * getXVal(86) + blW : 0; height: isActiveBL(86) ? rBL * getYo(86) + blH : 0 }
+-    Region { x: isActiveBL(87) ? inLeft - rBL * getXVal(87) + 1 + blX : 0; y: isActiveBL(87) ? inBottom + blY : 0; width: isActiveBL(87) ? rBL * getXVal(87) + blW : 0; height: isActiveBL(87) ? rBL * getYo(87) + blH : 0 }
+-    Region { x: isActiveBL(88) ? inLeft - rBL * getXVal(88) + 1 + blX : 0; y: isActiveBL(88) ? inBottom + blY : 0; width: isActiveBL(88) ? rBL * getXVal(88) + blW : 0; height: isActiveBL(88) ? rBL * getYo(88) + blH : 0 }
+-    Region { x: isActiveBL(89) ? inLeft - rBL * getXVal(89) + 1 + blX : 0; y: isActiveBL(89) ? inBottom + blY : 0; width: isActiveBL(89) ? rBL * getXVal(89) + blW : 0; height: isActiveBL(89) ? rBL * getYo(89) + blH : 0 }
+-    Region { x: isActiveBL(90) ? inLeft - rBL * getXVal(90) + 1 + blX : 0; y: isActiveBL(90) ? inBottom + blY : 0; width: isActiveBL(90) ? rBL * getXVal(90) + blW : 0; height: isActiveBL(90) ? rBL * getYo(90) + blH : 0 }
+-    Region { x: isActiveBL(91) ? inLeft - rBL * getXVal(91) + 1 + blX : 0; y: isActiveBL(91) ? inBottom + blY : 0; width: isActiveBL(91) ? rBL * getXVal(91) + blW : 0; height: isActiveBL(91) ? rBL * getYo(91) + blH : 0 }
+-    Region { x: isActiveBL(92) ? inLeft - rBL * getXVal(92) + 1 + blX : 0; y: isActiveBL(92) ? inBottom + blY : 0; width: isActiveBL(92) ? rBL * getXVal(92) + blW : 0; height: isActiveBL(92) ? rBL * getYo(92) + blH : 0 }
+-    Region { x: isActiveBL(93) ? inLeft - rBL * getXVal(93) + 1 + blX : 0; y: isActiveBL(93) ? inBottom + blY : 0; width: isActiveBL(93) ? rBL * getXVal(93) + blW : 0; height: isActiveBL(93) ? rBL * getYo(93) + blH : 0 }
+-    Region { x: isActiveBL(94) ? inLeft - rBL * getXVal(94) + 1 + blX : 0; y: isActiveBL(94) ? inBottom + blY : 0; width: isActiveBL(94) ? rBL * getXVal(94) + blW : 0; height: isActiveBL(94) ? rBL * getYo(94) + blH : 0 }
+-    Region { x: isActiveBL(95) ? inLeft - rBL * getXVal(95) + 1 + blX : 0; y: isActiveBL(95) ? inBottom + blY : 0; width: isActiveBL(95) ? rBL * getXVal(95) + blW : 0; height: isActiveBL(95) ? rBL * getYo(95) + blH : 0 }
+-    Region { x: isActiveBL(96) ? inLeft - rBL * getXVal(96) + 1 + blX : 0; y: isActiveBL(96) ? inBottom + blY : 0; width: isActiveBL(96) ? rBL * getXVal(96) + blW : 0; height: isActiveBL(96) ? rBL * getYo(96) + blH : 0 }
+-    Region { x: isActiveBL(97) ? inLeft - rBL * getXVal(97) + 1 + blX : 0; y: isActiveBL(97) ? inBottom + blY : 0; width: isActiveBL(97) ? rBL * getXVal(97) + blW : 0; height: isActiveBL(97) ? rBL * getYo(97) + blH : 0 }
+-    Region { x: isActiveBL(98) ? inLeft - rBL * getXVal(98) + 1 + blX : 0; y: isActiveBL(98) ? inBottom + blY : 0; width: isActiveBL(98) ? rBL * getXVal(98) + blW : 0; height: isActiveBL(98) ? rBL * getYo(98) + blH : 0 }
+-    Region { x: isActiveBL(99) ? inLeft - rBL * getXVal(99) + 1 + blX : 0; y: isActiveBL(99) ? inBottom + blY : 0; width: isActiveBL(99) ? rBL * getXVal(99) + blW : 0; height: isActiveBL(99) ? rBL * getYo(99) + blH : 0 }
+-    Region { x: isActiveBL(100) ? inLeft - rBL * getXVal(100) + 1 + blX : 0; y: isActiveBL(100) ? inBottom + blY : 0; width: isActiveBL(100) ? rBL * getXVal(100) + blW : 0; height: isActiveBL(100) ? rBL * getYo(100) + blH : 0 }
++    Region { x: isActiveBL(1) ? inLeft - rBL * getXVal(1) + blX : 0; y: isActiveBL(1) ? inBottom + blY : 0; width: isActiveBL(1) ? rBL * getXVal(1) + blW : 0; height: isActiveBL(1) ? rBL * getYo(1) + blH : 0 }
++    Region { x: isActiveBL(2) ? inLeft - rBL * getXVal(2) + blX : 0; y: isActiveBL(2) ? inBottom + blY : 0; width: isActiveBL(2) ? rBL * getXVal(2) + blW : 0; height: isActiveBL(2) ? rBL * getYo(2) + blH : 0 }
++    Region { x: isActiveBL(3) ? inLeft - rBL * getXVal(3) + blX : 0; y: isActiveBL(3) ? inBottom + blY : 0; width: isActiveBL(3) ? rBL * getXVal(3) + blW : 0; height: isActiveBL(3) ? rBL * getYo(3) + blH : 0 }
++    Region { x: isActiveBL(4) ? inLeft - rBL * getXVal(4) + blX : 0; y: isActiveBL(4) ? inBottom + blY : 0; width: isActiveBL(4) ? rBL * getXVal(4) + blW : 0; height: isActiveBL(4) ? rBL * getYo(4) + blH : 0 }
++    Region { x: isActiveBL(5) ? inLeft - rBL * getXVal(5) + blX : 0; y: isActiveBL(5) ? inBottom + blY : 0; width: isActiveBL(5) ? rBL * getXVal(5) + blW : 0; height: isActiveBL(5) ? rBL * getYo(5) + blH : 0 }
++    Region { x: isActiveBL(6) ? inLeft - rBL * getXVal(6) + blX : 0; y: isActiveBL(6) ? inBottom + blY : 0; width: isActiveBL(6) ? rBL * getXVal(6) + blW : 0; height: isActiveBL(6) ? rBL * getYo(6) + blH : 0 }
++    Region { x: isActiveBL(7) ? inLeft - rBL * getXVal(7) + blX : 0; y: isActiveBL(7) ? inBottom + blY : 0; width: isActiveBL(7) ? rBL * getXVal(7) + blW : 0; height: isActiveBL(7) ? rBL * getYo(7) + blH : 0 }
++    Region { x: isActiveBL(8) ? inLeft - rBL * getXVal(8) + blX : 0; y: isActiveBL(8) ? inBottom + blY : 0; width: isActiveBL(8) ? rBL * getXVal(8) + blW : 0; height: isActiveBL(8) ? rBL * getYo(8) + blH : 0 }
++    Region { x: isActiveBL(9) ? inLeft - rBL * getXVal(9) + blX : 0; y: isActiveBL(9) ? inBottom + blY : 0; width: isActiveBL(9) ? rBL * getXVal(9) + blW : 0; height: isActiveBL(9) ? rBL * getYo(9) + blH : 0 }
++    Region { x: isActiveBL(10) ? inLeft - rBL * getXVal(10) + blX : 0; y: isActiveBL(10) ? inBottom + blY : 0; width: isActiveBL(10) ? rBL * getXVal(10) + blW : 0; height: isActiveBL(10) ? rBL * getYo(10) + blH : 0 }
++    Region { x: isActiveBL(11) ? inLeft - rBL * getXVal(11) + blX : 0; y: isActiveBL(11) ? inBottom + blY : 0; width: isActiveBL(11) ? rBL * getXVal(11) + blW : 0; height: isActiveBL(11) ? rBL * getYo(11) + blH : 0 }
++    Region { x: isActiveBL(12) ? inLeft - rBL * getXVal(12) + blX : 0; y: isActiveBL(12) ? inBottom + blY : 0; width: isActiveBL(12) ? rBL * getXVal(12) + blW : 0; height: isActiveBL(12) ? rBL * getYo(12) + blH : 0 }
++    Region { x: isActiveBL(13) ? inLeft - rBL * getXVal(13) + blX : 0; y: isActiveBL(13) ? inBottom + blY : 0; width: isActiveBL(13) ? rBL * getXVal(13) + blW : 0; height: isActiveBL(13) ? rBL * getYo(13) + blH : 0 }
++    Region { x: isActiveBL(14) ? inLeft - rBL * getXVal(14) + blX : 0; y: isActiveBL(14) ? inBottom + blY : 0; width: isActiveBL(14) ? rBL * getXVal(14) + blW : 0; height: isActiveBL(14) ? rBL * getYo(14) + blH : 0 }
++    Region { x: isActiveBL(15) ? inLeft - rBL * getXVal(15) + blX : 0; y: isActiveBL(15) ? inBottom + blY : 0; width: isActiveBL(15) ? rBL * getXVal(15) + blW : 0; height: isActiveBL(15) ? rBL * getYo(15) + blH : 0 }
++    Region { x: isActiveBL(16) ? inLeft - rBL * getXVal(16) + blX : 0; y: isActiveBL(16) ? inBottom + blY : 0; width: isActiveBL(16) ? rBL * getXVal(16) + blW : 0; height: isActiveBL(16) ? rBL * getYo(16) + blH : 0 }
++    Region { x: isActiveBL(17) ? inLeft - rBL * getXVal(17) + blX : 0; y: isActiveBL(17) ? inBottom + blY : 0; width: isActiveBL(17) ? rBL * getXVal(17) + blW : 0; height: isActiveBL(17) ? rBL * getYo(17) + blH : 0 }
++    Region { x: isActiveBL(18) ? inLeft - rBL * getXVal(18) + blX : 0; y: isActiveBL(18) ? inBottom + blY : 0; width: isActiveBL(18) ? rBL * getXVal(18) + blW : 0; height: isActiveBL(18) ? rBL * getYo(18) + blH : 0 }
++    Region { x: isActiveBL(19) ? inLeft - rBL * getXVal(19) + blX : 0; y: isActiveBL(19) ? inBottom + blY : 0; width: isActiveBL(19) ? rBL * getXVal(19) + blW : 0; height: isActiveBL(19) ? rBL * getYo(19) + blH : 0 }
++    Region { x: isActiveBL(20) ? inLeft - rBL * getXVal(20) + blX : 0; y: isActiveBL(20) ? inBottom + blY : 0; width: isActiveBL(20) ? rBL * getXVal(20) + blW : 0; height: isActiveBL(20) ? rBL * getYo(20) + blH : 0 }
++    Region { x: isActiveBL(21) ? inLeft - rBL * getXVal(21) + blX : 0; y: isActiveBL(21) ? inBottom + blY : 0; width: isActiveBL(21) ? rBL * getXVal(21) + blW : 0; height: isActiveBL(21) ? rBL * getYo(21) + blH : 0 }
++    Region { x: isActiveBL(22) ? inLeft - rBL * getXVal(22) + blX : 0; y: isActiveBL(22) ? inBottom + blY : 0; width: isActiveBL(22) ? rBL * getXVal(22) + blW : 0; height: isActiveBL(22) ? rBL * getYo(22) + blH : 0 }
++    Region { x: isActiveBL(23) ? inLeft - rBL * getXVal(23) + blX : 0; y: isActiveBL(23) ? inBottom + blY : 0; width: isActiveBL(23) ? rBL * getXVal(23) + blW : 0; height: isActiveBL(23) ? rBL * getYo(23) + blH : 0 }
++    Region { x: isActiveBL(24) ? inLeft - rBL * getXVal(24) + blX : 0; y: isActiveBL(24) ? inBottom + blY : 0; width: isActiveBL(24) ? rBL * getXVal(24) + blW : 0; height: isActiveBL(24) ? rBL * getYo(24) + blH : 0 }
++    Region { x: isActiveBL(25) ? inLeft - rBL * getXVal(25) + blX : 0; y: isActiveBL(25) ? inBottom + blY : 0; width: isActiveBL(25) ? rBL * getXVal(25) + blW : 0; height: isActiveBL(25) ? rBL * getYo(25) + blH : 0 }
++    Region { x: isActiveBL(26) ? inLeft - rBL * getXVal(26) + blX : 0; y: isActiveBL(26) ? inBottom + blY : 0; width: isActiveBL(26) ? rBL * getXVal(26) + blW : 0; height: isActiveBL(26) ? rBL * getYo(26) + blH : 0 }
++    Region { x: isActiveBL(27) ? inLeft - rBL * getXVal(27) + blX : 0; y: isActiveBL(27) ? inBottom + blY : 0; width: isActiveBL(27) ? rBL * getXVal(27) + blW : 0; height: isActiveBL(27) ? rBL * getYo(27) + blH : 0 }
++    Region { x: isActiveBL(28) ? inLeft - rBL * getXVal(28) + blX : 0; y: isActiveBL(28) ? inBottom + blY : 0; width: isActiveBL(28) ? rBL * getXVal(28) + blW : 0; height: isActiveBL(28) ? rBL * getYo(28) + blH : 0 }
++    Region { x: isActiveBL(29) ? inLeft - rBL * getXVal(29) + blX : 0; y: isActiveBL(29) ? inBottom + blY : 0; width: isActiveBL(29) ? rBL * getXVal(29) + blW : 0; height: isActiveBL(29) ? rBL * getYo(29) + blH : 0 }
++    Region { x: isActiveBL(30) ? inLeft - rBL * getXVal(30) + blX : 0; y: isActiveBL(30) ? inBottom + blY : 0; width: isActiveBL(30) ? rBL * getXVal(30) + blW : 0; height: isActiveBL(30) ? rBL * getYo(30) + blH : 0 }
++    Region { x: isActiveBL(31) ? inLeft - rBL * getXVal(31) + blX : 0; y: isActiveBL(31) ? inBottom + blY : 0; width: isActiveBL(31) ? rBL * getXVal(31) + blW : 0; height: isActiveBL(31) ? rBL * getYo(31) + blH : 0 }
++    Region { x: isActiveBL(32) ? inLeft - rBL * getXVal(32) + blX : 0; y: isActiveBL(32) ? inBottom + blY : 0; width: isActiveBL(32) ? rBL * getXVal(32) + blW : 0; height: isActiveBL(32) ? rBL * getYo(32) + blH : 0 }
++    Region { x: isActiveBL(33) ? inLeft - rBL * getXVal(33) + blX : 0; y: isActiveBL(33) ? inBottom + blY : 0; width: isActiveBL(33) ? rBL * getXVal(33) + blW : 0; height: isActiveBL(33) ? rBL * getYo(33) + blH : 0 }
++    Region { x: isActiveBL(34) ? inLeft - rBL * getXVal(34) + blX : 0; y: isActiveBL(34) ? inBottom + blY : 0; width: isActiveBL(34) ? rBL * getXVal(34) + blW : 0; height: isActiveBL(34) ? rBL * getYo(34) + blH : 0 }
++    Region { x: isActiveBL(35) ? inLeft - rBL * getXVal(35) + blX : 0; y: isActiveBL(35) ? inBottom + blY : 0; width: isActiveBL(35) ? rBL * getXVal(35) + blW : 0; height: isActiveBL(35) ? rBL * getYo(35) + blH : 0 }
++    Region { x: isActiveBL(36) ? inLeft - rBL * getXVal(36) + blX : 0; y: isActiveBL(36) ? inBottom + blY : 0; width: isActiveBL(36) ? rBL * getXVal(36) + blW : 0; height: isActiveBL(36) ? rBL * getYo(36) + blH : 0 }
++    Region { x: isActiveBL(37) ? inLeft - rBL * getXVal(37) + blX : 0; y: isActiveBL(37) ? inBottom + blY : 0; width: isActiveBL(37) ? rBL * getXVal(37) + blW : 0; height: isActiveBL(37) ? rBL * getYo(37) + blH : 0 }
++    Region { x: isActiveBL(38) ? inLeft - rBL * getXVal(38) + blX : 0; y: isActiveBL(38) ? inBottom + blY : 0; width: isActiveBL(38) ? rBL * getXVal(38) + blW : 0; height: isActiveBL(38) ? rBL * getYo(38) + blH : 0 }
++    Region { x: isActiveBL(39) ? inLeft - rBL * getXVal(39) + blX : 0; y: isActiveBL(39) ? inBottom + blY : 0; width: isActiveBL(39) ? rBL * getXVal(39) + blW : 0; height: isActiveBL(39) ? rBL * getYo(39) + blH : 0 }
++    Region { x: isActiveBL(40) ? inLeft - rBL * getXVal(40) + blX : 0; y: isActiveBL(40) ? inBottom + blY : 0; width: isActiveBL(40) ? rBL * getXVal(40) + blW : 0; height: isActiveBL(40) ? rBL * getYo(40) + blH : 0 }
++    Region { x: isActiveBL(41) ? inLeft - rBL * getXVal(41) + blX : 0; y: isActiveBL(41) ? inBottom + blY : 0; width: isActiveBL(41) ? rBL * getXVal(41) + blW : 0; height: isActiveBL(41) ? rBL * getYo(41) + blH : 0 }
++    Region { x: isActiveBL(42) ? inLeft - rBL * getXVal(42) + blX : 0; y: isActiveBL(42) ? inBottom + blY : 0; width: isActiveBL(42) ? rBL * getXVal(42) + blW : 0; height: isActiveBL(42) ? rBL * getYo(42) + blH : 0 }
++    Region { x: isActiveBL(43) ? inLeft - rBL * getXVal(43) + blX : 0; y: isActiveBL(43) ? inBottom + blY : 0; width: isActiveBL(43) ? rBL * getXVal(43) + blW : 0; height: isActiveBL(43) ? rBL * getYo(43) + blH : 0 }
++    Region { x: isActiveBL(44) ? inLeft - rBL * getXVal(44) + blX : 0; y: isActiveBL(44) ? inBottom + blY : 0; width: isActiveBL(44) ? rBL * getXVal(44) + blW : 0; height: isActiveBL(44) ? rBL * getYo(44) + blH : 0 }
++    Region { x: isActiveBL(45) ? inLeft - rBL * getXVal(45) + blX : 0; y: isActiveBL(45) ? inBottom + blY : 0; width: isActiveBL(45) ? rBL * getXVal(45) + blW : 0; height: isActiveBL(45) ? rBL * getYo(45) + blH : 0 }
++    Region { x: isActiveBL(46) ? inLeft - rBL * getXVal(46) + blX : 0; y: isActiveBL(46) ? inBottom + blY : 0; width: isActiveBL(46) ? rBL * getXVal(46) + blW : 0; height: isActiveBL(46) ? rBL * getYo(46) + blH : 0 }
++    Region { x: isActiveBL(47) ? inLeft - rBL * getXVal(47) + blX : 0; y: isActiveBL(47) ? inBottom + blY : 0; width: isActiveBL(47) ? rBL * getXVal(47) + blW : 0; height: isActiveBL(47) ? rBL * getYo(47) + blH : 0 }
++    Region { x: isActiveBL(48) ? inLeft - rBL * getXVal(48) + blX : 0; y: isActiveBL(48) ? inBottom + blY : 0; width: isActiveBL(48) ? rBL * getXVal(48) + blW : 0; height: isActiveBL(48) ? rBL * getYo(48) + blH : 0 }
++    Region { x: isActiveBL(49) ? inLeft - rBL * getXVal(49) + blX : 0; y: isActiveBL(49) ? inBottom + blY : 0; width: isActiveBL(49) ? rBL * getXVal(49) + blW : 0; height: isActiveBL(49) ? rBL * getYo(49) + blH : 0 }
++    Region { x: isActiveBL(50) ? inLeft - rBL * getXVal(50) + blX : 0; y: isActiveBL(50) ? inBottom + blY : 0; width: isActiveBL(50) ? rBL * getXVal(50) + blW : 0; height: isActiveBL(50) ? rBL * getYo(50) + blH : 0 }
++    Region { x: isActiveBL(51) ? inLeft - rBL * getXVal(51) + blX : 0; y: isActiveBL(51) ? inBottom + blY : 0; width: isActiveBL(51) ? rBL * getXVal(51) + blW : 0; height: isActiveBL(51) ? rBL * getYo(51) + blH : 0 }
++    Region { x: isActiveBL(52) ? inLeft - rBL * getXVal(52) + blX : 0; y: isActiveBL(52) ? inBottom + blY : 0; width: isActiveBL(52) ? rBL * getXVal(52) + blW : 0; height: isActiveBL(52) ? rBL * getYo(52) + blH : 0 }
++    Region { x: isActiveBL(53) ? inLeft - rBL * getXVal(53) + blX : 0; y: isActiveBL(53) ? inBottom + blY : 0; width: isActiveBL(53) ? rBL * getXVal(53) + blW : 0; height: isActiveBL(53) ? rBL * getYo(53) + blH : 0 }
++    Region { x: isActiveBL(54) ? inLeft - rBL * getXVal(54) + blX : 0; y: isActiveBL(54) ? inBottom + blY : 0; width: isActiveBL(54) ? rBL * getXVal(54) + blW : 0; height: isActiveBL(54) ? rBL * getYo(54) + blH : 0 }
++    Region { x: isActiveBL(55) ? inLeft - rBL * getXVal(55) + blX : 0; y: isActiveBL(55) ? inBottom + blY : 0; width: isActiveBL(55) ? rBL * getXVal(55) + blW : 0; height: isActiveBL(55) ? rBL * getYo(55) + blH : 0 }
++    Region { x: isActiveBL(56) ? inLeft - rBL * getXVal(56) + blX : 0; y: isActiveBL(56) ? inBottom + blY : 0; width: isActiveBL(56) ? rBL * getXVal(56) + blW : 0; height: isActiveBL(56) ? rBL * getYo(56) + blH : 0 }
++    Region { x: isActiveBL(57) ? inLeft - rBL * getXVal(57) + blX : 0; y: isActiveBL(57) ? inBottom + blY : 0; width: isActiveBL(57) ? rBL * getXVal(57) + blW : 0; height: isActiveBL(57) ? rBL * getYo(57) + blH : 0 }
++    Region { x: isActiveBL(58) ? inLeft - rBL * getXVal(58) + blX : 0; y: isActiveBL(58) ? inBottom + blY : 0; width: isActiveBL(58) ? rBL * getXVal(58) + blW : 0; height: isActiveBL(58) ? rBL * getYo(58) + blH : 0 }
++    Region { x: isActiveBL(59) ? inLeft - rBL * getXVal(59) + blX : 0; y: isActiveBL(59) ? inBottom + blY : 0; width: isActiveBL(59) ? rBL * getXVal(59) + blW : 0; height: isActiveBL(59) ? rBL * getYo(59) + blH : 0 }
++    Region { x: isActiveBL(60) ? inLeft - rBL * getXVal(60) + blX : 0; y: isActiveBL(60) ? inBottom + blY : 0; width: isActiveBL(60) ? rBL * getXVal(60) + blW : 0; height: isActiveBL(60) ? rBL * getYo(60) + blH : 0 }
++    Region { x: isActiveBL(61) ? inLeft - rBL * getXVal(61) + blX : 0; y: isActiveBL(61) ? inBottom + blY : 0; width: isActiveBL(61) ? rBL * getXVal(61) + blW : 0; height: isActiveBL(61) ? rBL * getYo(61) + blH : 0 }
++    Region { x: isActiveBL(62) ? inLeft - rBL * getXVal(62) + blX : 0; y: isActiveBL(62) ? inBottom + blY : 0; width: isActiveBL(62) ? rBL * getXVal(62) + blW : 0; height: isActiveBL(62) ? rBL * getYo(62) + blH : 0 }
++    Region { x: isActiveBL(63) ? inLeft - rBL * getXVal(63) + blX : 0; y: isActiveBL(63) ? inBottom + blY : 0; width: isActiveBL(63) ? rBL * getXVal(63) + blW : 0; height: isActiveBL(63) ? rBL * getYo(63) + blH : 0 }
++    Region { x: isActiveBL(64) ? inLeft - rBL * getXVal(64) + blX : 0; y: isActiveBL(64) ? inBottom + blY : 0; width: isActiveBL(64) ? rBL * getXVal(64) + blW : 0; height: isActiveBL(64) ? rBL * getYo(64) + blH : 0 }
++    Region { x: isActiveBL(65) ? inLeft - rBL * getXVal(65) + blX : 0; y: isActiveBL(65) ? inBottom + blY : 0; width: isActiveBL(65) ? rBL * getXVal(65) + blW : 0; height: isActiveBL(65) ? rBL * getYo(65) + blH : 0 }
++    Region { x: isActiveBL(66) ? inLeft - rBL * getXVal(66) + blX : 0; y: isActiveBL(66) ? inBottom + blY : 0; width: isActiveBL(66) ? rBL * getXVal(66) + blW : 0; height: isActiveBL(66) ? rBL * getYo(66) + blH : 0 }
++    Region { x: isActiveBL(67) ? inLeft - rBL * getXVal(67) + blX : 0; y: isActiveBL(67) ? inBottom + blY : 0; width: isActiveBL(67) ? rBL * getXVal(67) + blW : 0; height: isActiveBL(67) ? rBL * getYo(67) + blH : 0 }
++    Region { x: isActiveBL(68) ? inLeft - rBL * getXVal(68) + blX : 0; y: isActiveBL(68) ? inBottom + blY : 0; width: isActiveBL(68) ? rBL * getXVal(68) + blW : 0; height: isActiveBL(68) ? rBL * getYo(68) + blH : 0 }
++    Region { x: isActiveBL(69) ? inLeft - rBL * getXVal(69) + blX : 0; y: isActiveBL(69) ? inBottom + blY : 0; width: isActiveBL(69) ? rBL * getXVal(69) + blW : 0; height: isActiveBL(69) ? rBL * getYo(69) + blH : 0 }
++    Region { x: isActiveBL(70) ? inLeft - rBL * getXVal(70) + blX : 0; y: isActiveBL(70) ? inBottom + blY : 0; width: isActiveBL(70) ? rBL * getXVal(70) + blW : 0; height: isActiveBL(70) ? rBL * getYo(70) + blH : 0 }
++    Region { x: isActiveBL(71) ? inLeft - rBL * getXVal(71) + blX : 0; y: isActiveBL(71) ? inBottom + blY : 0; width: isActiveBL(71) ? rBL * getXVal(71) + blW : 0; height: isActiveBL(71) ? rBL * getYo(71) + blH : 0 }
++    Region { x: isActiveBL(72) ? inLeft - rBL * getXVal(72) + blX : 0; y: isActiveBL(72) ? inBottom + blY : 0; width: isActiveBL(72) ? rBL * getXVal(72) + blW : 0; height: isActiveBL(72) ? rBL * getYo(72) + blH : 0 }
++    Region { x: isActiveBL(73) ? inLeft - rBL * getXVal(73) + blX : 0; y: isActiveBL(73) ? inBottom + blY : 0; width: isActiveBL(73) ? rBL * getXVal(73) + blW : 0; height: isActiveBL(73) ? rBL * getYo(73) + blH : 0 }
++    Region { x: isActiveBL(74) ? inLeft - rBL * getXVal(74) + blX : 0; y: isActiveBL(74) ? inBottom + blY : 0; width: isActiveBL(74) ? rBL * getXVal(74) + blW : 0; height: isActiveBL(74) ? rBL * getYo(74) + blH : 0 }
++    Region { x: isActiveBL(75) ? inLeft - rBL * getXVal(75) + blX : 0; y: isActiveBL(75) ? inBottom + blY : 0; width: isActiveBL(75) ? rBL * getXVal(75) + blW : 0; height: isActiveBL(75) ? rBL * getYo(75) + blH : 0 }
++    Region { x: isActiveBL(76) ? inLeft - rBL * getXVal(76) + blX : 0; y: isActiveBL(76) ? inBottom + blY : 0; width: isActiveBL(76) ? rBL * getXVal(76) + blW : 0; height: isActiveBL(76) ? rBL * getYo(76) + blH : 0 }
++    Region { x: isActiveBL(77) ? inLeft - rBL * getXVal(77) + blX : 0; y: isActiveBL(77) ? inBottom + blY : 0; width: isActiveBL(77) ? rBL * getXVal(77) + blW : 0; height: isActiveBL(77) ? rBL * getYo(77) + blH : 0 }
++    Region { x: isActiveBL(78) ? inLeft - rBL * getXVal(78) + blX : 0; y: isActiveBL(78) ? inBottom + blY : 0; width: isActiveBL(78) ? rBL * getXVal(78) + blW : 0; height: isActiveBL(78) ? rBL * getYo(78) + blH : 0 }
++    Region { x: isActiveBL(79) ? inLeft - rBL * getXVal(79) + blX : 0; y: isActiveBL(79) ? inBottom + blY : 0; width: isActiveBL(79) ? rBL * getXVal(79) + blW : 0; height: isActiveBL(79) ? rBL * getYo(79) + blH : 0 }
++    Region { x: isActiveBL(80) ? inLeft - rBL * getXVal(80) + blX : 0; y: isActiveBL(80) ? inBottom + blY : 0; width: isActiveBL(80) ? rBL * getXVal(80) + blW : 0; height: isActiveBL(80) ? rBL * getYo(80) + blH : 0 }
++    Region { x: isActiveBL(81) ? inLeft - rBL * getXVal(81) + blX : 0; y: isActiveBL(81) ? inBottom + blY : 0; width: isActiveBL(81) ? rBL * getXVal(81) + blW : 0; height: isActiveBL(81) ? rBL * getYo(81) + blH : 0 }
++    Region { x: isActiveBL(82) ? inLeft - rBL * getXVal(82) + blX : 0; y: isActiveBL(82) ? inBottom + blY : 0; width: isActiveBL(82) ? rBL * getXVal(82) + blW : 0; height: isActiveBL(82) ? rBL * getYo(82) + blH : 0 }
++    Region { x: isActiveBL(83) ? inLeft - rBL * getXVal(83) + blX : 0; y: isActiveBL(83) ? inBottom + blY : 0; width: isActiveBL(83) ? rBL * getXVal(83) + blW : 0; height: isActiveBL(83) ? rBL * getYo(83) + blH : 0 }
++    Region { x: isActiveBL(84) ? inLeft - rBL * getXVal(84) + blX : 0; y: isActiveBL(84) ? inBottom + blY : 0; width: isActiveBL(84) ? rBL * getXVal(84) + blW : 0; height: isActiveBL(84) ? rBL * getYo(84) + blH : 0 }
++    Region { x: isActiveBL(85) ? inLeft - rBL * getXVal(85) + blX : 0; y: isActiveBL(85) ? inBottom + blY : 0; width: isActiveBL(85) ? rBL * getXVal(85) + blW : 0; height: isActiveBL(85) ? rBL * getYo(85) + blH : 0 }
++    Region { x: isActiveBL(86) ? inLeft - rBL * getXVal(86) + blX : 0; y: isActiveBL(86) ? inBottom + blY : 0; width: isActiveBL(86) ? rBL * getXVal(86) + blW : 0; height: isActiveBL(86) ? rBL * getYo(86) + blH : 0 }
++    Region { x: isActiveBL(87) ? inLeft - rBL * getXVal(87) + blX : 0; y: isActiveBL(87) ? inBottom + blY : 0; width: isActiveBL(87) ? rBL * getXVal(87) + blW : 0; height: isActiveBL(87) ? rBL * getYo(87) + blH : 0 }
++    Region { x: isActiveBL(88) ? inLeft - rBL * getXVal(88) + blX : 0; y: isActiveBL(88) ? inBottom + blY : 0; width: isActiveBL(88) ? rBL * getXVal(88) + blW : 0; height: isActiveBL(88) ? rBL * getYo(88) + blH : 0 }
++    Region { x: isActiveBL(89) ? inLeft - rBL * getXVal(89) + blX : 0; y: isActiveBL(89) ? inBottom + blY : 0; width: isActiveBL(89) ? rBL * getXVal(89) + blW : 0; height: isActiveBL(89) ? rBL * getYo(89) + blH : 0 }
++    Region { x: isActiveBL(90) ? inLeft - rBL * getXVal(90) + blX : 0; y: isActiveBL(90) ? inBottom + blY : 0; width: isActiveBL(90) ? rBL * getXVal(90) + blW : 0; height: isActiveBL(90) ? rBL * getYo(90) + blH : 0 }
++    Region { x: isActiveBL(91) ? inLeft - rBL * getXVal(91) + blX : 0; y: isActiveBL(91) ? inBottom + blY : 0; width: isActiveBL(91) ? rBL * getXVal(91) + blW : 0; height: isActiveBL(91) ? rBL * getYo(91) + blH : 0 }
++    Region { x: isActiveBL(92) ? inLeft - rBL * getXVal(92) + blX : 0; y: isActiveBL(92) ? inBottom + blY : 0; width: isActiveBL(92) ? rBL * getXVal(92) + blW : 0; height: isActiveBL(92) ? rBL * getYo(92) + blH : 0 }
++    Region { x: isActiveBL(93) ? inLeft - rBL * getXVal(93) + blX : 0; y: isActiveBL(93) ? inBottom + blY : 0; width: isActiveBL(93) ? rBL * getXVal(93) + blW : 0; height: isActiveBL(93) ? rBL * getYo(93) + blH : 0 }
++    Region { x: isActiveBL(94) ? inLeft - rBL * getXVal(94) + blX : 0; y: isActiveBL(94) ? inBottom + blY : 0; width: isActiveBL(94) ? rBL * getXVal(94) + blW : 0; height: isActiveBL(94) ? rBL * getYo(94) + blH : 0 }
++    Region { x: isActiveBL(95) ? inLeft - rBL * getXVal(95) + blX : 0; y: isActiveBL(95) ? inBottom + blY : 0; width: isActiveBL(95) ? rBL * getXVal(95) + blW : 0; height: isActiveBL(95) ? rBL * getYo(95) + blH : 0 }
++    Region { x: isActiveBL(96) ? inLeft - rBL * getXVal(96) + blX : 0; y: isActiveBL(96) ? inBottom + blY : 0; width: isActiveBL(96) ? rBL * getXVal(96) + blW : 0; height: isActiveBL(96) ? rBL * getYo(96) + blH : 0 }
++    Region { x: isActiveBL(97) ? inLeft - rBL * getXVal(97) + blX : 0; y: isActiveBL(97) ? inBottom + blY : 0; width: isActiveBL(97) ? rBL * getXVal(97) + blW : 0; height: isActiveBL(97) ? rBL * getYo(97) + blH : 0 }
++    Region { x: isActiveBL(98) ? inLeft - rBL * getXVal(98) + blX : 0; y: isActiveBL(98) ? inBottom + blY : 0; width: isActiveBL(98) ? rBL * getXVal(98) + blW : 0; height: isActiveBL(98) ? rBL * getYo(98) + blH : 0 }
++    Region { x: isActiveBL(99) ? inLeft - rBL * getXVal(99) + blX : 0; y: isActiveBL(99) ? inBottom + blY : 0; width: isActiveBL(99) ? rBL * getXVal(99) + blW : 0; height: isActiveBL(99) ? rBL * getYo(99) + blH : 0 }
++    Region { x: isActiveBL(100) ? inLeft - rBL * getXVal(100) + blX : 0; y: isActiveBL(100) ? inBottom + blY : 0; width: isActiveBL(100) ? rBL * getXVal(100) + blW : 0; height: isActiveBL(100) ? rBL * getYo(100) + blH : 0 }
+ 
+     Region { x: isActiveBR(1) ? inRight + brX : 0; y: isActiveBR(1) ? inBottom + brY : 0; width: isActiveBR(1) ? rBR * getXVal(1) + brW : 0; height: isActiveBR(1) ? rBR * getYo(1) + brH : 0 }
+     Region { x: isActiveBR(2) ? inRight + brX : 0; y: isActiveBR(2) ? inBottom + brY : 0; width: isActiveBR(2) ? rBR * getXVal(2) + brW : 0; height: isActiveBR(2) ? rBR * getYo(2) + brH : 0 }
+diff --git a/shell/modules/drawers/blur/BlurOffsets.qml b/shell/modules/drawers/blur/BlurOffsets.qml
+index ed4bcd83..0f8ae4d9 100644
+--- a/shell/modules/drawers/blur/BlurOffsets.qml
++++ b/shell/modules/drawers/blur/BlurOffsets.qml
+@@ -33,11 +33,15 @@ Item {
+     property real tX: {
+         if (!target) return 0;
+         let _ = target.x + target.width;
++        for (let p = target.parent; p && p !== contentItem; p = p.parent)
++            _ += p.x + p.width;
+         return target.parent ? target.parent.mapToItem(contentItem, target.x, target.y).x : 0;
+     }
+     property real tY: {
+         if (!target) return 0;
+         let _ = target.y + target.height;
++        for (let p = target.parent; p && p !== contentItem; p = p.parent)
++            _ += p.y + p.height;
+         return target.parent ? target.parent.mapToItem(contentItem, target.x, target.y).y : 0;
+     }
+     property real tScale: target ? Math.max(0, target.scale) : 1
+@@ -48,12 +52,28 @@ Item {
+     property real dm22: (useMasks && deformMatrix.m22 > 0) ? deformMatrix.m22 : 1
+     property real deformOffsetX: useMasks ? (tW / 2) * (1 - tScale * dm11) : (tW / 2) * (1 - tScale)
+     property real deformOffsetY: useMasks ? (tH / 2) * (1 - tScale * dm22) : (tH / 2) * (1 - tScale)
+-    property real bX: useMasks ? tX + deformOffsetX + sLeft * dm11 : 0
+-    property real bY: useMasks ? tY + deformOffsetY + sTop * dm22 : 0
+-    property real bW: (isActive && useMasks) ? Math.max(0, tW * tScale * dm11 - sLeft * dm11 - sRight * dm11) : 0
+-    property real bH: (isActive && useMasks) ? Math.max(0, tH * tScale * dm22 - sTop * dm22 - sBottom * dm22) : 0
+-    property real r: (isActive && useMasks) ? Math.min(bW / 2, Math.min(bH / 2, root.radius * tScale)) : 0
+     property bool isIsland: (target && target["isIsland"] !== undefined) ? target["isIsland"] : false
++    readonly property bool freeTop: isIsland || (vAnchor !== "top" && vAnchor !== "both" && sTop >= 0)
++    readonly property bool freeBottom: isIsland || (vAnchor !== "bottom" && vAnchor !== "both" && sBottom >= 0)
++    readonly property bool freeLeft: isIsland || (hAnchor !== "left" && hAnchor !== "both" && sLeft >= 0)
++    readonly property bool freeRight: isIsland || (hAnchor !== "right" && hAnchor !== "both" && sRight >= 0)
++    readonly property bool isDeformingX: Math.abs(dm11 - 1) > 0.0005 || tScale < 0.999
++    readonly property bool isDeformingY: Math.abs(dm22 - 1) > 0.0005 || tScale < 0.999
++    readonly property real deformInsetX: isDeformingX ? (1 + Math.min(2, Math.abs(dm11 - 1) * 40)) : 0
++    readonly property real deformInsetY: isDeformingY ? (1 + Math.min(2, Math.abs(dm22 - 1) * 40)) : 0
++    readonly property real rawX: useMasks ? tX + deformOffsetX + sLeft * dm11 : 0
++    readonly property real rawY: useMasks ? tY + deformOffsetY + sTop * dm22 : 0
++    readonly property real rawW: (isActive && useMasks) ? Math.max(0, tW * tScale * dm11 - sLeft * dm11 - sRight * dm11) : 0
++    readonly property real rawH: (isActive && useMasks) ? Math.max(0, tH * tScale * dm22 - sTop * dm22 - sBottom * dm22) : 0
++    readonly property real padLeft: freeLeft ? deformInsetX : 0
++    readonly property real padRight: freeRight ? deformInsetX : 0
++    readonly property real padTop: freeTop ? deformInsetY : 0
++    readonly property real padBottom: freeBottom ? deformInsetY : 0
++    property real bX: (isActive && useMasks) ? (isDeformingX ? Math.ceil(rawX + padLeft) : Math.round(rawX)) : 0
++    property real bY: (isActive && useMasks) ? (isDeformingY ? Math.ceil(rawY + padTop) : Math.round(rawY)) : 0
++    property real bW: (isActive && useMasks) ? Math.max(0, (isDeformingX ? Math.floor(rawX + rawW - padRight) : Math.round(rawX + rawW)) - bX) : 0
++    property real bH: (isActive && useMasks) ? Math.max(0, (isDeformingY ? Math.floor(rawY + rawH - padBottom) : Math.round(rawY + rawH)) - bY) : 0
++    property real r: (isActive && useMasks) ? Math.min(bW / 2, Math.min(bH / 2, root.radius * tScale)) : 0
+     property real rTop: (!isIsland && (vAnchor === "top" || vAnchor === "both")) ? 0 : r
+     property real rBottom: (!isIsland && (vAnchor === "bottom" || vAnchor === "both")) ? 0 : r
+     property real rLeft: (!isIsland && (hAnchor === "left" || hAnchor === "both")) ? 0 : r
+diff --git a/shell/modules/nexus/WindowFactory.qml b/shell/modules/nexus/WindowFactory.qml
+index 48f1419e..0cc25288 100644
+--- a/shell/modules/nexus/WindowFactory.qml
++++ b/shell/modules/nexus/WindowFactory.qml
+@@ -4,6 +4,7 @@ import QtQuick
+ import QtQuick.Layouts
+ import QtQuick.Window
+ import Quickshell
++import Quickshell.Io
+ import Quickshell.Wayland
+ import Caelestia.Config
+ import Caelestia.Services
+@@ -73,6 +74,38 @@ Singleton {
+         id: dummy
+     }
+ 
++    // Keep KWin's Rounded Corners effect radius in sync with Caelestia's Border rounding.
++    Timer {
++        id: kwinCornerSyncTimer
++
++        interval: 150
++        onTriggered: {
++            const r = Math.max(0, Math.round(GlobalConfig.border.rounding));
++            kwinCornerSyncProc.command = [
++                "bash", "-c",
++                `r=${r}; cur=$(kreadconfig6 --file kwinrc --group Round-Corners --key Size 2>/dev/null || true); ` +
++                `if [ "$cur" != "$r" ]; then ` +
++                `kwriteconfig6 --file kwinrc --group Round-Corners --key Size "$r" && ` +
++                `kwriteconfig6 --file kwinrc --group Round-Corners --key InactiveCornerRadius "$r" && ` +
++                `qdbus6 org.kde.KWin /Effects reconfigureEffect kwin4_effect_shapecorners >/dev/null 2>&1 || true; fi`
++            ];
++            kwinCornerSyncProc.running = true;
++        }
++    }
++
++    Process {
++        id: kwinCornerSyncProc
++    }
++
++    Connections {
++        target: GlobalConfig.border
++        function onRoundingChanged(): void {
++            kwinCornerSyncTimer.restart();
++        }
++    }
++
++    Component.onCompleted: kwinCornerSyncTimer.restart()
++
+     // building the window costs seconds of CPU, so it is built once while idle and then only hidden/shown
+     Timer {
+         running: true
+@@ -118,7 +151,7 @@ Singleton {
+                     root.openWindow = null;
+             }
+ 
+-            readonly property real cornerRadius: win.maximized ? 0 : Tokens.rounding.large
++            readonly property real cornerRadius: win.maximized ? 0 : GlobalConfig.border.rounding
+ 
+             color: "transparent"
+ 
+diff --git a/shell/modules/utilities/toasts/Toasts.qml b/shell/modules/utilities/toasts/Toasts.qml
+index 2985b137..4e11a978 100644
+--- a/shell/modules/utilities/toasts/Toasts.qml
++++ b/shell/modules/utilities/toasts/Toasts.qml
+@@ -13,6 +13,16 @@ Item {
+     readonly property int spacing: Tokens.spacing.small
+     property bool flag
+     required property DrawerVisibilities visibilities
++    readonly property var toastItems: {
++        root.flag;
++        const items = [];
++        for (let i = 0; i < repeater.count; i++) {
++            const item = repeater.itemAt(i);
++            if (item)
++                items.push(item);
++        }
++        return items;
++    }
+ 
+     /// Which edges the stack hangs from, and which way it grows. The corner itself is the
+     /// selector's business: a stack only needs to know its two sides.
+@@ -108,6 +118,9 @@ Item {
+     Repeater {
+         id: repeater
+ 
++        onItemAdded: root.flagChanged()
++        onItemRemoved: root.flagChanged()
++
+         model: ScriptModel {
+             values: {
+                 const toasts = [];
+@@ -135,6 +148,7 @@ Item {
+ 
+         required property int index
+         required property Toast modelData
++        readonly property real radius: toastInner.radius
+         readonly property bool previewHidden: {
+             let extraHidden = 0;
+             for (let i = 0; i < index; i++)
+-- 
+2.56.1
+

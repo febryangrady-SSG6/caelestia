@@ -1,0 +1,25 @@
+From fef4ed147b2ac3a9cc4a1bf11311d45e5ed8024f Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 21:22:24 +0700
+Subject: [PATCH 28/47] fix(bar): keep click-opened status icon popouts open
+ until dismissed
+
+---
+ shell/modules/bar/components/BarIcon.qml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/shell/modules/bar/components/BarIcon.qml b/shell/modules/bar/components/BarIcon.qml
+index 9ef71005..217b6bef 100644
+--- a/shell/modules/bar/components/BarIcon.qml
++++ b/shell/modules/bar/components/BarIcon.qml
+@@ -78,6 +78,7 @@ Item {
+         popouts.currentName = name;
+         popouts.currentCenter = root.isHorizontal ? root.mapToItem(null, root.width / 2, 0).x : root.mapToItem(null, 0, root.height / 2).y;
+         popouts.hasCurrent = true;
++        popouts.staysOpen = true;
+     }
+ 
+     implicitWidth: root.isHorizontal ? Math.round(glyphLoader.implicitWidth) : root.barThickness
+-- 
+2.56.1
+

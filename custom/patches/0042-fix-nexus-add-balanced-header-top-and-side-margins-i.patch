@@ -1,0 +1,36 @@
+From 7d3fafa96b0b7cc2a94f0cbe398331d4c77a734d Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 03:10:39 +0700
+Subject: [PATCH 42/47] fix(nexus): add balanced header top and side margins in
+ PageBase
+
+---
+ shell/modules/nexus/common/PageBase.qml | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/shell/modules/nexus/common/PageBase.qml b/shell/modules/nexus/common/PageBase.qml
+index 7573520e..5d33f812 100644
+--- a/shell/modules/nexus/common/PageBase.qml
++++ b/shell/modules/nexus/common/PageBase.qml
+@@ -336,14 +336,16 @@ ColumnLayout {
+         implicitWidth: header.implicitWidth
+         implicitHeight: 46
+         Layout.preferredHeight: 46
++        Layout.topMargin: Tokens.padding.medium
++        Layout.bottomMargin: Tokens.spacing.extraSmall
+         Layout.fillWidth: true
+ 
+         RowLayout {
+             id: header
+ 
+             anchors.fill: parent
+-            anchors.leftMargin: Tokens.padding.medium
+-            anchors.rightMargin: Tokens.padding.medium
++            anchors.leftMargin: Tokens.padding.large
++            anchors.rightMargin: Tokens.padding.large
+             spacing: Tokens.spacing.largeIncreased
+ 
+             Loader {
+-- 
+2.56.1
+

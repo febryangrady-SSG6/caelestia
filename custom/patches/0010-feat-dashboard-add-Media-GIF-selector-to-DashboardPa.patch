@@ -1,0 +1,121 @@
+From 0fc1ca0f27298a7bdbc967c165b3c18a822b614b Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 01:19:54 +0700
+Subject: [PATCH 10/47] feat(dashboard): add Media GIF selector to
+ DashboardPanel
+
+---
+ shell/modules/nexus/PageRowIndex.qml          | 14 ++++-
+ .../nexus/pages/panels/DashboardPanel.qml     | 57 +++++++++++++++++++
+ 2 files changed, 70 insertions(+), 1 deletion(-)
+
+diff --git a/shell/modules/nexus/PageRowIndex.qml b/shell/modules/nexus/PageRowIndex.qml
+index e3a4d5a1..e56fe773 100644
+--- a/shell/modules/nexus/PageRowIndex.qml
++++ b/shell/modules/nexus/PageRowIndex.qml
+@@ -1181,7 +1181,19 @@ QtObject {
+         },
+         {
+             label: qsTr("Terminal"),
+-            description: qsTr("Apply system theme colors to the media GIF"),
++            section: qsTr("Dashboard"),
++            pageIdx: 2,
++            subPage: "dashboard"
++        },
++        {
++            label: qsTr("Media GIF"),
++            description: qsTr("Animated GIF shown on the dashboard media card (%1)"),
++            section: qsTr("Dashboard"),
++            pageIdx: 2,
++            subPage: "dashboard"
++        },
++        {
++            label: qsTr("Custom media GIF"),
+             section: qsTr("Dashboard"),
+             pageIdx: 2,
+             subPage: "dashboard"
+diff --git a/shell/modules/nexus/pages/panels/DashboardPanel.qml b/shell/modules/nexus/pages/panels/DashboardPanel.qml
+index 9c48d7fc..91fdffdc 100644
+--- a/shell/modules/nexus/pages/panels/DashboardPanel.qml
++++ b/shell/modules/nexus/pages/panels/DashboardPanel.qml
+@@ -7,6 +7,7 @@ import M3Shapes
+ import Caelestia.Config
+ import qs.components
+ import qs.components.controls
++import qs.components.filedialog
+ import qs.services
+ import qs.utils
+ import qs.modules.nexus.common
+@@ -14,6 +15,24 @@ import qs.modules.nexus.common
+ PageBase {
+     id: root
+ 
++    readonly property list<MenuItem> mediaGifItems: [
++        MenuItem {
++            icon: "animation"
++            text: qsTr("Kuru Kuru")
++            value: "root:/assets/kurukuru.gif"
++        },
++        MenuItem {
++            icon: "pets"
++            text: qsTr("Bongo Cat")
++            value: "root:/assets/bongocat.gif"
++        },
++        MenuItem {
++            icon: "cruelty_free"
++            text: qsTr("Dino")
++            value: "root:/assets/dino.gif"
++        }
++    ]
++
+     readonly property list<MenuItem> dashboardShapeItems: [
+         MenuItem {
+             property int value: MaterialShape.Circle
+@@ -185,6 +204,44 @@ PageBase {
+             onToggled: GlobalConfig.dashboard.showTerminal = checked
+         }
+ 
++        SelectRow {
++            id: mediaGifSelect
++
++            Layout.fillWidth: true
++            label: qsTr("Media GIF")
++            subtext: qsTr("Animated GIF shown on the dashboard media card (%1)").arg(Config.paths.mediaGif.split("/").pop() || qsTr("Default"))
++            active: root.mediaGifItems.find(item => item.value === Config.paths.mediaGif) ?? null
++            fallbackText: qsTr("Custom")
++            fallbackIcon: "image"
++            menuItems: root.mediaGifItems
++            onSelected: item => {
++                GlobalConfig.paths.mediaGif = item.value;
++                GlobalConfig.save();
++                active = Qt.binding(() => root.mediaGifItems.find(i => i.value === Config.paths.mediaGif) ?? null);
++            }
++        }
++
++        NavRow {
++            Layout.fillWidth: true
++            icon: "folder_open"
++            label: qsTr("Custom media GIF")
++            status: Config.paths.mediaGif ? Config.paths.mediaGif.split("/").pop() : qsTr("Not set")
++            onClicked: mediaGifDialog.open()
++
++            FileDialog {
++                id: mediaGifDialog
++
++                title: qsTr("Select Dashboard Media GIF")
++                filterLabel: qsTr("Images and GIFs (*.gif, *.webp, *.png, *.apng, *.jpg)")
++                filters: ["gif", "webp", "png", "apng", "jpg", "jpeg"]
++                onAccepted: path => {
++                    GlobalConfig.paths.mediaGif = path;
++                    GlobalConfig.save();
++                    mediaGifSelect.active = Qt.binding(() => root.mediaGifItems.find(i => i.value === Config.paths.mediaGif) ?? null);
++                }
++            }
++        }
++
+         ToggleRow {
+             Layout.fillWidth: true
+             text: qsTr("Recolor media GIF")
+-- 
+2.56.1
+

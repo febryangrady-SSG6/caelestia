@@ -1,0 +1,144 @@
+From 022db8992a35fdcaba1159ac8083d3e20e2a6b05 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 02:46:21 +0700
+Subject: [PATCH 40/47] fix(nexus): clamp and clip page scrollbars and prevent
+ rebound freeze
+
+---
+ shell/components/containers/StyledFlickable.qml |  8 ++++++--
+ shell/components/containers/StyledListView.qml  |  8 ++++++--
+ shell/modules/nexus/Pages.qml                   |  1 +
+ shell/modules/nexus/SubcategoryPane.qml         | 10 +++++++---
+ shell/modules/nexus/common/PageBase.qml         | 11 ++++++++---
+ 5 files changed, 28 insertions(+), 10 deletions(-)
+
+diff --git a/shell/components/containers/StyledFlickable.qml b/shell/components/containers/StyledFlickable.qml
+index e3fd1245..a6bce55e 100644
+--- a/shell/components/containers/StyledFlickable.qml
++++ b/shell/components/containers/StyledFlickable.qml
+@@ -12,11 +12,15 @@ Flickable {
+     rebound: Transition {
+         onRunningChanged: {
+             const canScroll = root.interactive && (root.contentHeight > root.height || root.contentWidth > root.width);
+-            if (!running && !root.doneFakeFlick && root.enableFakeFlick && canScroll) {
++            if (!running && !root.doneFakeFlick && root.enableFakeFlick && canScroll
++                && root.verticalOvershoot === 0 && root.horizontalOvershoot === 0) {
+                 root.doneFakeFlick = true;
+                 root.flick(1, 1);
+                 root.flick(-1, -1);
+-                Qt.callLater(() => root.cancelFlick());
++                Qt.callLater(() => {
++                    root.cancelFlick();
++                    root.returnToBounds();
++                });
+             }
+         }
+ 
+diff --git a/shell/components/containers/StyledListView.qml b/shell/components/containers/StyledListView.qml
+index 00ba4a48..6fc534f7 100644
+--- a/shell/components/containers/StyledListView.qml
++++ b/shell/components/containers/StyledListView.qml
+@@ -12,11 +12,15 @@ ListView {
+     rebound: Transition {
+         onRunningChanged: {
+             const canScroll = root.interactive && (root.contentHeight > root.height || root.contentWidth > root.width);
+-            if (!running && !root.doneFakeFlick && root.enableFakeFlick && canScroll) {
++            if (!running && !root.doneFakeFlick && root.enableFakeFlick && canScroll
++                && root.verticalOvershoot === 0 && root.horizontalOvershoot === 0) {
+                 root.doneFakeFlick = true;
+                 root.flick(1, 1);
+                 root.flick(-1, -1);
+-                Qt.callLater(() => root.cancelFlick());
++                Qt.callLater(() => {
++                    root.cancelFlick();
++                    root.returnToBounds();
++                });
+             }
+         }
+ 
+diff --git a/shell/modules/nexus/Pages.qml b/shell/modules/nexus/Pages.qml
+index 915e430c..c4107c1b 100644
+--- a/shell/modules/nexus/Pages.qml
++++ b/shell/modules/nexus/Pages.qml
+@@ -6,6 +6,7 @@ import qs.modules.nexus
+ Item {
+     id: root
+ 
++    clip: true
+     required property NexusState nState
+ 
+     property int lastPageIdx
+diff --git a/shell/modules/nexus/SubcategoryPane.qml b/shell/modules/nexus/SubcategoryPane.qml
+index cf8a64b3..c7f59933 100644
+--- a/shell/modules/nexus/SubcategoryPane.qml
++++ b/shell/modules/nexus/SubcategoryPane.qml
+@@ -186,18 +186,22 @@ ColumnLayout {
+ 
+         Layout.fillWidth: true
+         Layout.fillHeight: true
++        boundsBehavior: Flickable.StopAtBounds
+ 
+         topMargin: 0
+         bottomMargin: Tokens.padding.large
+         contentHeight: cardsColumn.implicitHeight
+ 
+         StyledRect {
++            readonly property real rawY: flickable.visibleArea.yPosition * flickable.height
++            readonly property real rawHeight: Math.max(24, Math.min(flickable.height, flickable.height * flickable.visibleArea.heightRatio))
++
+             z: 2
+-            visible: flickable.contentHeight > flickable.height + 1
++            visible: flickable.contentHeight > flickable.height + 1 && height > 0
+             width: 3
+-            height: Math.max(24, flickable.height * flickable.visibleArea.heightRatio)
++            height: Math.max(0, Math.min(flickable.height, rawHeight + Math.min(0, rawY)))
+             x: flickable.width - Tokens.padding.small
+-            y: flickable.contentY + flickable.visibleArea.yPosition * flickable.height
++            y: flickable.contentY + Math.max(0, Math.min(flickable.height - height, rawY))
+             radius: Tokens.rounding.full
+             color: Colours.palette.m3primary
+             opacity: 0.6
+diff --git a/shell/modules/nexus/common/PageBase.qml b/shell/modules/nexus/common/PageBase.qml
+index 9f82f376..7573520e 100644
+--- a/shell/modules/nexus/common/PageBase.qml
++++ b/shell/modules/nexus/common/PageBase.qml
+@@ -386,12 +386,14 @@ ColumnLayout {
+     Item {
+         Layout.fillWidth: true
+         Layout.fillHeight: true
++        clip: true
+ 
+         VerticalFadeFlickable {
+             id: flickable
+ 
+             anchors.fill: parent
+             interactive: root.scrollable
++            boundsBehavior: Flickable.StopAtBounds
+ 
+             topMargin: 0
+             bottomMargin: Tokens.padding.large
+@@ -405,15 +407,18 @@ ColumnLayout {
+         StyledRect {
+             id: scrollBar
+ 
++            readonly property real rawY: flickable.visibleArea.yPosition * flickable.height
++            readonly property real rawHeight: Math.max(24, Math.min(flickable.height, flickable.height * flickable.visibleArea.heightRatio))
++
+             anchors.right: parent.right
+             anchors.rightMargin: Tokens.padding.small
+             z: 2
+ 
+-            visible: flickable.contentHeight > flickable.height + 1
++            visible: root.scrollable && flickable.contentHeight > flickable.height + 1 && height > 0
+ 
+             width: 3
+-            height: Math.max(24, flickable.height * flickable.visibleArea.heightRatio)
+-            y: flickable.visibleArea.yPosition * flickable.height
++            height: Math.max(0, Math.min(flickable.height, rawHeight + Math.min(0, rawY)))
++            y: Math.max(0, Math.min(flickable.height - height, rawY))
+             radius: Tokens.rounding.full
+             color: Colours.palette.m3primary
+             opacity: 0.6
+-- 
+2.56.1
+

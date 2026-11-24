@@ -1,0 +1,164 @@
+From 89b4afd227e7c4692b98529389ecdc94b8e167c6 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 03:32:32 +0700
+Subject: [PATCH 21/47] fix(nmqt): resolve ethernet interface by name and pass
+ device UNI
+
+---
+ shell/plugin/src/Caelestia/Services/NmQt.cpp | 101 ++++++++++++-------
+ 1 file changed, 62 insertions(+), 39 deletions(-)
+
+diff --git a/shell/plugin/src/Caelestia/Services/NmQt.cpp b/shell/plugin/src/Caelestia/Services/NmQt.cpp
+index 9c238eca..98cd9f7f 100644
+--- a/shell/plugin/src/Caelestia/Services/NmQt.cpp
++++ b/shell/plugin/src/Caelestia/Services/NmQt.cpp
+@@ -157,6 +157,23 @@ NetworkManager::WirelessDevice::Ptr findWirelessDevice() {
+     return {};
+ }
+ 
++NetworkManager::Device::Ptr findDeviceByIdentifier(const QString& interfaceOrUni) {
++    if (interfaceOrUni.isEmpty())
++        return {};
++
++    if (auto dev = NetworkManager::findNetworkInterface(interfaceOrUni))
++        return dev;
++
++    for (const auto& dev : NetworkManager::networkInterfaces()) {
++        if (!dev)
++            continue;
++        if (dev->interfaceName() == interfaceOrUni || dev->ipInterfaceName() == interfaceOrUni)
++            return dev;
++    }
++
++    return NetworkManager::findDeviceByIpFace(interfaceOrUni);
++}
++
+ } // namespace
+ 
+ NmQt::NmQt(QObject* parent)
+@@ -618,50 +635,55 @@ void NmQt::rescanWifi() {
+ }
+ 
+ void NmQt::connectEthernet(const QString& connectionName, const QString& interfaceName, QJSValue callback) {
++    const auto dev = findDeviceByIdentifier(interfaceName);
++    const QString deviceUni = dev ? dev->uni() : QString();
++
++    auto watchActivation = [this, callback](const QDBusPendingCall& reply) {
++        auto* watcher = new QDBusPendingCallWatcher(reply, this);
++        connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, callback](QDBusPendingCallWatcher* w) {
++            w->deleteLater();
++            QDBusPendingReply<QDBusObjectPath> r = *w;
++            if (r.isError())
++                qCWarning(lcNmQt) << "connectEthernet failed:" << r.error().message();
++            invokeCallback(callback, !r.isError(), r.isError() ? QString() : QStringLiteral("Connected"),
++                r.isError() ? r.error().message() : QString());
++            refreshEthernetDevices();
++        });
++    };
++
+     if (!connectionName.isEmpty()) {
+-        const auto connPaths = NetworkManager::listConnections();
+-        for (const auto& conn : connPaths) {
+-            if (conn && conn->name() == connectionName) {
+-                QDBusPendingReply<QDBusObjectPath> reply =
+-                    NetworkManager::activateConnection(conn->path(), interfaceName, QString());
+-                auto* watcher = new QDBusPendingCallWatcher(reply, this);
+-                connect(
+-                    watcher, &QDBusPendingCallWatcher::finished, this, [this, callback](QDBusPendingCallWatcher* w) {
+-                        w->deleteLater();
+-                        QDBusPendingReply<QDBusObjectPath> r = *w;
+-                        invokeCallback(callback, !r.isError(), r.isError() ? QString() : QStringLiteral("Connected"),
+-                            r.isError() ? r.error().message() : QString());
+-                        refreshEthernetDevices();
+-                    });
++        for (const auto& conn : NetworkManager::listConnections()) {
++            if (conn && (conn->name() == connectionName || conn->uuid() == connectionName)) {
++                watchActivation(NetworkManager::activateConnection(conn->path(), deviceUni, QString()));
+                 return;
+             }
+         }
+     }
+ 
+-    if (!interfaceName.isEmpty()) {
+-        auto dev = NetworkManager::findNetworkInterface(interfaceName);
+-        if (!dev)
+-            dev = NetworkManager::findDeviceByIpFace(interfaceName);
+-        if (dev) {
+-            const auto availableConnections = dev->availableConnections();
+-            if (!availableConnections.isEmpty()) {
+-                const auto connection = availableConnections.front();
+-                QDBusPendingReply<QDBusObjectPath> reply =
+-                    NetworkManager::activateConnection(connection->path(), dev->uni(), QString());
+-                auto* watcher = new QDBusPendingCallWatcher(reply, this);
+-                connect(
+-                    watcher, &QDBusPendingCallWatcher::finished, this, [this, callback](QDBusPendingCallWatcher* w) {
+-                        w->deleteLater();
+-                        QDBusPendingReply<QDBusObjectPath> r = *w;
+-                        invokeCallback(callback, !r.isError(), r.isError() ? QString() : QStringLiteral("Connected"),
+-                            r.isError() ? r.error().message() : QString());
+-                        refreshEthernetDevices();
+-                    });
++    if (dev) {
++        const auto availableConnections = dev->availableConnections();
++        if (!availableConnections.isEmpty()) {
++            const auto connection = availableConnections.front();
++            watchActivation(NetworkManager::activateConnection(connection->path(), dev->uni(), QString()));
++            return;
++        }
++
++        for (const auto& conn : connectionsWithSettings()) {
++            if (conn->settings()->connectionType() != NetworkManager::ConnectionSettings::Wired)
++                continue;
++            const QString boundIface = conn->settings()->interfaceName();
++            if (boundIface.isEmpty() || boundIface == dev->interfaceName()) {
++                watchActivation(NetworkManager::activateConnection(conn->path(), dev->uni(), QString()));
+                 return;
+             }
+         }
++
++        // No saved profile matches yet: let NetworkManager create & activate a default wired profile.
++        watchActivation(NetworkManager::addAndActivateConnection(NMVariantMapMap{}, dev->uni(), QString()));
++        return;
+     }
+ 
++    qCWarning(lcNmQt) << "connectEthernet: no matching connection or device for" << connectionName << interfaceName;
+     invokeCallback(callback, false, {}, QStringLiteral("No connection name or interface specified"), -1);
+ }
+ 
+@@ -1331,6 +1353,11 @@ void NmQt::refreshEthernetDevices() {
+                 }
+             }
+         }
++        if (info.value(QStringLiteral("connection")).toString().isEmpty()) {
++            const auto available = dev->availableConnections();
++            if (!available.isEmpty() && available.front())
++                info[QStringLiteral("connection")] = available.front()->name();
++        }
+ 
+         devices.append(info);
+ 
+@@ -1470,9 +1497,7 @@ void NmQt::refreshVpnConnections() {
+ void NmQt::refreshWirelessDeviceDetails(const QString& interfaceName) {
+     NetworkManager::WirelessDevice::Ptr wifiDev;
+     if (!interfaceName.isEmpty()) {
+-        auto dev = NetworkManager::findNetworkInterface(interfaceName);
+-        if (!dev)
+-            dev = NetworkManager::findDeviceByIpFace(interfaceName);
++        auto dev = findDeviceByIdentifier(interfaceName);
+         wifiDev = dev.dynamicCast<NetworkManager::WirelessDevice>();
+     } else {
+         for (const auto& dev : NetworkManager::networkInterfaces()) {
+@@ -1531,9 +1556,7 @@ void NmQt::refreshWirelessDeviceDetails(const QString& interfaceName) {
+ void NmQt::refreshEthernetDeviceDetails(const QString& interfaceName) {
+     NetworkManager::Device::Ptr ethDev;
+     if (!interfaceName.isEmpty()) {
+-        ethDev = NetworkManager::findNetworkInterface(interfaceName);
+-        if (!ethDev)
+-            ethDev = NetworkManager::findDeviceByIpFace(interfaceName);
++        ethDev = findDeviceByIdentifier(interfaceName);
+     } else {
+         for (const auto& dev : NetworkManager::networkInterfaces()) {
+             if (dev && dev->type() == NetworkManager::Device::Ethernet &&
+-- 
+2.56.1
+

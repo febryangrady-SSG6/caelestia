@@ -1,0 +1,25 @@
+From 3f80c7937fe2330c86d785d5c12e0f9783c9c12f Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 01:03:32 +0700
+Subject: [PATCH 08/47] fix(bar): left-align labels in BarComponentContext
+ popout rows
+
+---
+ shell/modules/bar/popouts/BarComponentContext.qml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/shell/modules/bar/popouts/BarComponentContext.qml b/shell/modules/bar/popouts/BarComponentContext.qml
+index cecd3843..42609a27 100644
+--- a/shell/modules/bar/popouts/BarComponentContext.qml
++++ b/shell/modules/bar/popouts/BarComponentContext.qml
+@@ -111,6 +111,7 @@ ColumnLayout {
+ 
+             StyledText {
+                 Layout.alignment: Qt.AlignVCenter
++                Layout.fillWidth: true
+                 text: row.labelText
+                 color: Colours.palette.m3onSurface
+                 font.pointSize: Tokens.font.body.medium.pointSize * root.fontScale
+-- 
+2.56.1
+

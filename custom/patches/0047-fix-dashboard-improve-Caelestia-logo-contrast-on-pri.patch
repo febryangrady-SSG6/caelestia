@@ -1,0 +1,30 @@
+From 409a82aa522a1f27b03035915fee65a76db669d3 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 23 Nov 2026 22:23:52 +0700
+Subject: [PATCH 47/47] fix(dashboard): improve Caelestia logo contrast on
+ primaryContainer gem
+
+---
+ shell/modules/dashboard/dash/User.qml | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/shell/modules/dashboard/dash/User.qml b/shell/modules/dashboard/dash/User.qml
+index 770def68..046705a3 100644
+--- a/shell/modules/dashboard/dash/User.qml
++++ b/shell/modules/dashboard/dash/User.qml
+@@ -179,8 +179,11 @@ Item {
+         Logo {
+             implicitWidth: Tokens.sizes.dashboard.logoSize
+             implicitHeight: Tokens.sizes.dashboard.logoSize
+-            topColour: Colours.palette.m3primary
++            topColour: Qt.alpha(Colours.palette.m3onPrimaryContainer, 0.75)
+             bottomColour: Colours.palette.m3onPrimaryContainer
++            badgeColour: Colours.palette.m3onPrimaryContainer
++            badgeIconColour: Colours.palette.m3primaryContainer
++            badgeStrokeColour: Colours.palette.m3primaryContainer
+         }
+     }
+ 
+-- 
+2.56.1
+

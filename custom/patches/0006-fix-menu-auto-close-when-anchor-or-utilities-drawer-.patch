@@ -1,0 +1,47 @@
+From 300dc12176c81b28d9a10e854be6095f1fd69c9a Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 00:49:08 +0700
+Subject: [PATCH 06/47] fix(menu): auto-close when anchor or utilities drawer
+ hides
+
+---
+ shell/components/controls/Menu.qml | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/shell/components/controls/Menu.qml b/shell/components/controls/Menu.qml
+index 3dfbe87a..f92c5ecf 100644
+--- a/shell/components/controls/Menu.qml
++++ b/shell/components/controls/Menu.qml
+@@ -151,6 +151,10 @@ MouseArea {
+     }
+ 
+     onExpandedChanged: {
++        if (expanded && root.attachTo && !root.attachTo.visible) {
++            expanded = false;
++            return;
++        }
+         if (expanded) {
+             closeTimer.stop();
+         } else {
+@@ -168,6 +172,18 @@ MouseArea {
+             revealOut.start();
+     }
+ 
++    Connections {
++        function onVisibleChanged(): void {
++            if (root.expanded && !root.attachTo?.visible) {
++                closeTimer.stop();
++                root.submenuOpen = false;
++                root.expanded = false;
++            }
++        }
++
++        target: root.attachTo
++    }
++
+     parent: {
+         let node = root.attachTo;
+         let interactionsNode = null;
+-- 
+2.56.1
+

@@ -1,0 +1,74 @@
+From b83ae190c93406f9dd343298e8b6aa25f1d95615 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 01:15:31 +0700
+Subject: [PATCH 38/47] fix(bar): remove popout close blur halo and prevent
+ first-open sidebar gap
+
+---
+ shell/modules/bar/popouts/Audio.qml       | 2 +-
+ shell/modules/bar/popouts/ClipWrapper.qml | 8 ++++----
+ shell/modules/bar/popouts/Network.qml     | 2 +-
+ shell/modules/drawers/Panels.qml          | 2 +-
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/Audio.qml b/shell/modules/bar/popouts/Audio.qml
+index fae72eea..e89d6311 100644
+--- a/shell/modules/bar/popouts/Audio.qml
++++ b/shell/modules/bar/popouts/Audio.qml
+@@ -18,7 +18,7 @@ ColumnLayout {
+ 
+     property real scaleOffset: 1.0
+     property real fontScale: 1.0
+-    property bool _isSidebarOpen: false
++    property bool _isSidebarOpen: popouts?.sidebarOpen ?? false
+     property bool _outputsOpen: false
+     property int _streamCount: Audio.appStreams.length
+ 
+diff --git a/shell/modules/bar/popouts/ClipWrapper.qml b/shell/modules/bar/popouts/ClipWrapper.qml
+index b36075bd..0b5d1ee4 100644
+--- a/shell/modules/bar/popouts/ClipWrapper.qml
++++ b/shell/modules/bar/popouts/ClipWrapper.qml
+@@ -196,10 +196,10 @@ Item {
+         isPanelHorizontal: root.isHorizontal
+         underSidebar: root.activePanel === root.bar && (!root.isHorizontal || content.currentCenter - root.parent.leftMargin >= root.parent.width - Visibilities.sidebarWidthFor(Tokens.sizes.sidebar.width))
+ 
+-        anchors.leftMargin: root.activePanel.position === "left" ? (-implicitWidth - 5) * root.clampedOffsetScale : 0
+-        anchors.rightMargin: root.activePanel.position === "right" ? (-implicitWidth - 5) * root.clampedOffsetScale : 0
+-        anchors.topMargin: root.activePanel.position === "top" ? (-implicitHeight - 5) * root.clampedOffsetScale : 0
+-        anchors.bottomMargin: root.activePanel.position === "bottom" ? (-implicitHeight - 5) * root.clampedOffsetScale : 0
++        anchors.leftMargin: root.activePanel.position === "left" ? (-implicitWidth) * root.clampedOffsetScale : 0
++        anchors.rightMargin: root.activePanel.position === "right" ? (-implicitWidth) * root.clampedOffsetScale : 0
++        anchors.topMargin: root.activePanel.position === "top" ? (-implicitHeight) * root.clampedOffsetScale : 0
++        anchors.bottomMargin: root.activePanel.position === "bottom" ? (-implicitHeight) * root.clampedOffsetScale : 0
+ 
+         transform: Scale {
+             xScale: root.lampScaleX
+diff --git a/shell/modules/bar/popouts/Network.qml b/shell/modules/bar/popouts/Network.qml
+index 7fa8542a..cc2aa622 100644
+--- a/shell/modules/bar/popouts/Network.qml
++++ b/shell/modules/bar/popouts/Network.qml
+@@ -20,7 +20,7 @@ ColumnLayout {
+     /// than a flag each, so two of them cannot be open at once — and the rows they hang off
+     /// are rebuilt whenever the scan reorders the list, so this is the popout's state.
+     property string openSection: ""
+-    property bool _isSidebarOpen: false
++    property bool _isSidebarOpen: popouts?.sidebarOpen ?? false
+ 
+     readonly property var activeDeviceDetails: root.view === "wireless" ? Nmcli.wirelessDeviceDetails : Nmcli.ethernetDeviceDetails
+     readonly property var activeDetails: {
+diff --git a/shell/modules/drawers/Panels.qml b/shell/modules/drawers/Panels.qml
+index e31319f9..3d147729 100644
+--- a/shell/modules/drawers/Panels.qml
++++ b/shell/modules/drawers/Panels.qml
+@@ -395,7 +395,7 @@ Item {
+         property bool shouldPush: root.popoutIntersectsSidebar && !popoutsWrapper.content.isDockPopout
+         // A popout no wider than the sidebar is drawn joined to it (ContentWindow.qml),
+         // so it goes right below the sidebar instead of leaving a gap.
+-        readonly property real pushSpacing: popoutsWrapper.content.implicitWidth <= Visibilities.sidebarWidthFor(Tokens.sizes.sidebar.width) + 1 ? 0 : Tokens.spacing.extraLarge
++        readonly property real pushSpacing: popoutsWrapper.content.nonAnimWidth <= Visibilities.sidebarWidthFor(Tokens.sizes.sidebar.width) + 1 ? 0 : Tokens.spacing.extraLarge
+ 
+         visibilities: root.visibilities
+         popouts: popoutsWrapper.content
+-- 
+2.56.1
+

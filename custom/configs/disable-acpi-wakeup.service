@@ -1,0 +1,11 @@
+[Unit]
+Description=Disable spurious AMD AM5 ACPI wakeup sources (GP17, XHC0, XHC1, XH00)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'for dev in GP17 XHC0 XHC1 XH00; do grep -qE "^${dev}[[:space:]].*\\*enabled" /proc/acpi/wakeup && echo "$dev" > /proc/acpi/wakeup; done; exit 0'
+
+[Install]
+WantedBy=multi-user.target

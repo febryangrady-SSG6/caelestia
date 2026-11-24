@@ -1,0 +1,25 @@
+From b5228e584346d1e21c1b0c085fafb14516cfc0db Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 01:31:07 +0700
+Subject: [PATCH 12/47] fix(utilities): import qs.services for
+ DrawerConfirmModal message color
+
+---
+ shell/modules/utilities/DrawerConfirmModal.qml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/shell/modules/utilities/DrawerConfirmModal.qml b/shell/modules/utilities/DrawerConfirmModal.qml
+index e7d8aa27..2608f18e 100644
+--- a/shell/modules/utilities/DrawerConfirmModal.qml
++++ b/shell/modules/utilities/DrawerConfirmModal.qml
+@@ -5,6 +5,7 @@ import QtQuick.Layouts
+ import Caelestia.Config
+ import qs.components
+ import qs.components.controls
++import qs.services
+ 
+ /// The card a utilities-drawer modal shows when it asks before doing something:
+ /// a title, what confirming affects, and Cancel / confirm buttons. Cancelling and
+-- 
+2.56.1
+

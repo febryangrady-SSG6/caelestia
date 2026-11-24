@@ -1,0 +1,49 @@
+From c0897ad5ef353d7b090fad4d5086fc761242be8c Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 22:17:02 +0700
+Subject: [PATCH 29/47] fix(bar): balance TrayOverflow padding and float hover
+ nameTag outside box
+
+---
+ shell/modules/bar/popouts/TrayOverflow.qml | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/TrayOverflow.qml b/shell/modules/bar/popouts/TrayOverflow.qml
+index 0a806c1e..e0ba6cd5 100644
+--- a/shell/modules/bar/popouts/TrayOverflow.qml
++++ b/shell/modules/bar/popouts/TrayOverflow.qml
+@@ -44,13 +44,14 @@ Item {
+     // few before it holds any: one icon should not leave a hole the size of one icon.
+     readonly property int maxRows: 4
+     readonly property int minColumns: 3
+-    readonly property int minRows: 2
++    readonly property int minRows: 1
+     readonly property int filled: root.items.length + root.widgets.length
+-    readonly property int columns: Math.max(root.minColumns, Math.ceil(Math.sqrt(root.filled)), Math.ceil(root.filled / root.maxRows))
++    readonly property int columns: root.filled > 0 ? Math.min(root.filled, Math.max(root.minColumns, Math.ceil(Math.sqrt(root.filled)), Math.ceil(root.filled / root.maxRows))) : root.minColumns
+     readonly property int rows: Math.max(root.minRows, Math.ceil(root.filled / root.columns))
+ 
+     readonly property real cell: 34 * root.scaleOffset * root.fontScale
+     readonly property real gap: Tokens.spacing.small * root.scaleOffset
++    readonly property real padding: Tokens.padding.medium * root.scaleOffset
+     readonly property real gridWidth: root.columns * root.cell + (root.columns - 1) * root.gap
+     readonly property real gridHeight: root.rows * root.cell + (root.rows - 1) * root.gap
+     // The box leans in when a drag is over it, so it is obvious the icon will land
+@@ -133,11 +134,11 @@ Item {
+         }
+     }
+ 
+-    // The panel frames the grid; the box is exactly the cells it holds. Measuring the
++    // The panel frames the grid with uniform padding on all four sides. Measuring the
+     // grid instead would let whatever a cell holds set the size, and one wide widget put
+     // in a cell would open the box halfway across the screen.
+-    implicitWidth: root.gridWidth
+-    implicitHeight: root.gridHeight
++    implicitWidth: root.gridWidth + root.padding * 2
++    implicitHeight: root.gridHeight + root.padding * 2
+     width: implicitWidth
+     height: implicitHeight
+ 
+-- 
+2.56.1
+

@@ -1,0 +1,179 @@
+From 9c5ddafeee1721001e1af43662d8ce0a05360b27 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 00:22:00 +0700
+Subject: [PATCH 33/47] feat(nexus): add Antigravity CLI provider settings and
+ connect to sidebar AI Assistant
+
+---
+ shell/modules/nexus/pages/AiSettingsPage.qml | 65 ++++++++++++++++++++
+ shell/modules/sidebar/AiAssistant.qml        | 11 +---
+ shell/modules/sidebar/Content.qml            |  2 +-
+ shell/services/AntigravityOptions.qml        | 24 ++++++++
+ 4 files changed, 92 insertions(+), 10 deletions(-)
+ create mode 100644 shell/services/AntigravityOptions.qml
+
+diff --git a/shell/modules/nexus/pages/AiSettingsPage.qml b/shell/modules/nexus/pages/AiSettingsPage.qml
+index 949382fd..49ab210b 100644
+--- a/shell/modules/nexus/pages/AiSettingsPage.qml
++++ b/shell/modules/nexus/pages/AiSettingsPage.qml
+@@ -192,6 +192,20 @@ PageBase {
+ 
+     readonly property bool claudeInstalled: claudeVersion !== "" && claudeVersion !== "NOT_INSTALLED"
+ 
++    property string antigravityVersion: ""
++    property string antigravityBin: ""
++
++    readonly property bool antigravityInstalled: antigravityVersion !== "" && antigravityVersion !== "NOT_INSTALLED"
++
++    readonly property string antigravityStatusText: {
++        if (antigravityVersion === "")
++            return qsTr("Checking…");
++        if (!antigravityInstalled)
++            return qsTr("Not installed");
++        const m = (antigravityVersion || "").match(/[0-9]+\.[0-9]+\.[0-9]+/);
++        return m ? m[0] : antigravityVersion;
++    }
++
+     property bool installing: false
+ 
+     property string installStatus: ""
+@@ -403,6 +417,22 @@ PageBase {
+             }
+         }
+ 
++        Process {
++            id: antigravityStatusProc
++
++            running: true
++            command: ["sh", "-c", "p=\"$(command -v agy 2>/dev/null || true)\"; if [ -n \"$p\" ]; then printf 'BIN=%s\\n' \"$p\"; printf 'VER=%s\\n' \"$(\"$p\" --version 2>/dev/null | head -n1)\"; else echo 'VER=NOT_INSTALLED'; fi"]
++            stdout: SplitParser {
++                onRead: line => {
++                    const t = (line || "").trim();
++                    if (t.startsWith("BIN="))
++                        root.antigravityBin = t.slice(4);
++                    else if (t.startsWith("VER="))
++                        root.antigravityVersion = t.slice(4) || "Installed";
++                }
++            }
++        }
++
+         Process {
+             id: installProc
+ 
+@@ -559,6 +589,41 @@ exit $status`]
+             }
+         }
+ 
++        SectionHeader {
++            text: qsTr("Antigravity")
++        }
++
++        ToggleRow {
++            first: true
++            last: !AntigravityOptions.enabled
++            text: qsTr("Antigravity")
++            subtext: qsTr("Uses the Antigravity CLI (agy) and your Google login")
++            reset: ({
++                customGet: () => AntigravityOptions.enabled,
++                customDef: false,
++                customSet: v => { AntigravityOptions.enabled = v; }
++            })
++            checked: AntigravityOptions.enabled
++            onToggled: AntigravityOptions.enabled = checked
++        }
++
++        InfoRow {
++            visible: AntigravityOptions.enabled
++            last: !root.antigravityInstalled
++            label: qsTr("Status")
++            value: root.antigravityStatusText
++            subtext: !root.antigravityInstalled && root.antigravityVersion !== "" ? qsTr("Install the agy CLI to use Antigravity in the sidebar") : ""
++        }
++
++        NavRow {
++            visible: AntigravityOptions.enabled && root.antigravityInstalled
++            last: true
++            icon: "login"
++            label: qsTr("Log in to Antigravity")
++            status: qsTr("Opens agy login in your terminal")
++            onClicked: Launch.launchInTerminal([root.antigravityBin || "agy", "login"], root.homeDir())
++        }
++
+         SectionHeader {
+             text: qsTr("Claude")
+         }
+diff --git a/shell/modules/sidebar/AiAssistant.qml b/shell/modules/sidebar/AiAssistant.qml
+index 04a2a525..1a5f1929 100644
+--- a/shell/modules/sidebar/AiAssistant.qml
++++ b/shell/modules/sidebar/AiAssistant.qml
+@@ -25,14 +25,7 @@ import "ai/antigravity.js" as Antigravity
+ Item {
+     id: root
+ 
+-    Settings {
+-        id: antigravitySettings
+-
+-        category: "AntigravityAI"
+-        property string model: "default"
+-        property string effort: "default"
+-        property string cachedModelsJson: ""
+-    }
++    readonly property var antigravitySettings: AntigravityOptions
+ 
+     ChatStore {
+         id: chatStore
+@@ -753,7 +746,7 @@ Item {
+ 
+     readonly property var providerList: {
+         var l = [];
+-        if (antigravityAvailable || provider === "antigravity")
++        if (AntigravityOptions.enabled && (antigravityAvailable || provider === "antigravity"))
+             l.push("antigravity");
+         if (GlobalConfig.ai.enableOllama)
+             l.push("ollama");
+diff --git a/shell/modules/sidebar/Content.qml b/shell/modules/sidebar/Content.qml
+index 03f02cc0..509db2fb 100644
+--- a/shell/modules/sidebar/Content.qml
++++ b/shell/modules/sidebar/Content.qml
+@@ -22,7 +22,7 @@ Item {
+     // or one of the shell's file dialogs is open (clicking into a dialog can close
+     // the sidebar, and unloading it would destroy the dialog's owner with it).
+     readonly property bool keepLoaded: (aiLoader.item?.busy ?? false) || Visibilities.openDialogs > 0
+-    readonly property bool aiEnabled: GlobalConfig.ai.enableAiAssistant && (GlobalConfig.ai.enableOllama || GlobalConfig.ai.enableClaudeCode || GlobalConfig.ai.enableClaude || GlobalConfig.ai.enableOpenai || GlobalConfig.ai.enableGemini || GlobalConfig.ai.enableOpenrouter || GlobalConfig.ai.enableOpencode || GlobalConfig.ai.enableOpencodeGo || GlobalConfig.ai.enableCheaperInference || GlobalConfig.ai.defaultProvider === "antigravity")
++    readonly property bool aiEnabled: GlobalConfig.ai.enableAiAssistant && (GlobalConfig.ai.enableOllama || GlobalConfig.ai.enableClaudeCode || GlobalConfig.ai.enableClaude || GlobalConfig.ai.enableOpenai || GlobalConfig.ai.enableGemini || GlobalConfig.ai.enableOpenrouter || GlobalConfig.ai.enableOpencode || GlobalConfig.ai.enableOpencodeGo || GlobalConfig.ai.enableCheaperInference || AntigravityOptions.enabled)
+ 
+     function checkAiTab(): void {
+         if (!root.aiEnabled && root.activeTab === "ai") {
+diff --git a/shell/services/AntigravityOptions.qml b/shell/services/AntigravityOptions.qml
+new file mode 100644
+index 00000000..f95e375d
+--- /dev/null
++++ b/shell/services/AntigravityOptions.qml
+@@ -0,0 +1,24 @@
++pragma Singleton
++
++import QtCore
++import Quickshell
++
++// Persists Antigravity CLI AI options outside the compiled C++ AiConfig schema.
++Singleton {
++    id: root
++
++    property alias enabled: antigravitySettings.enabled
++    property alias model: antigravitySettings.model
++    property alias effort: antigravitySettings.effort
++    property alias cachedModelsJson: antigravitySettings.cachedModelsJson
++
++    Settings {
++        id: antigravitySettings
++
++        category: "AntigravityAI"
++        property bool enabled: false
++        property string model: "default"
++        property string effort: "default"
++        property string cachedModelsJson: ""
++    }
++}
+-- 
+2.56.1
+

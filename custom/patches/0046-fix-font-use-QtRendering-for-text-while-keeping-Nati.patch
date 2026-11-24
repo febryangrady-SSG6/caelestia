@@ -1,0 +1,99 @@
+From 36d6d256077d45777e53adcd5c34543cf6df96da Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 23 Nov 2026 22:16:20 +0700
+Subject: [PATCH 46/47] fix(font): use QtRendering for text while keeping
+ NativeRendering for MaterialIcon
+
+---
+ shell/components/MaterialIcon.qml           | 1 +
+ shell/components/StyledText.qml             | 2 +-
+ shell/components/controls/TextFieldBase.qml | 2 +-
+ shell/modules/bar/popouts/Notes.qml         | 4 ++--
+ shell/modules/dashboard/NotesTab.qml        | 4 ++--
+ 5 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/shell/components/MaterialIcon.qml b/shell/components/MaterialIcon.qml
+index 4e5bb0b4..d798c082 100644
+--- a/shell/components/MaterialIcon.qml
++++ b/shell/components/MaterialIcon.qml
+@@ -11,6 +11,7 @@ StyledText {
+     // the font was rendered at.
+     property real fontScale: 1
+ 
++    renderType: Text.NativeRendering
+     swapFromScale: 0.25
+ 
+     font: Tokens.font.icon.size(Math.round(fontStyle.pointSize * fontScale)).weight(fontStyle.weight).fill(fill.toFixed(1)).grade(grade).build()
+diff --git a/shell/components/StyledText.qml b/shell/components/StyledText.qml
+index 8a1747e5..d00b1015 100644
+--- a/shell/components/StyledText.qml
++++ b/shell/components/StyledText.qml
+@@ -12,7 +12,7 @@ Text {
+     // legible; a run of text stays at 1, where a shrink would just look like a wobble.
+     property real swapFromScale: 1
+ 
+-    renderType: Text.NativeRendering
++    renderType: Text.QtRendering
+     textFormat: Text.PlainText
+     color: Colours.palette.m3onSurface
+     font: Tokens.font.body.small
+diff --git a/shell/components/controls/TextFieldBase.qml b/shell/components/controls/TextFieldBase.qml
+index 80722b62..136821c1 100644
+--- a/shell/components/controls/TextFieldBase.qml
++++ b/shell/components/controls/TextFieldBase.qml
+@@ -19,7 +19,7 @@ TextField {
+     Accessible.name: root.placeholderText
+ 
+     font: Tokens.font.body.small
+-    renderType: TextField.NativeRendering
++    renderType: TextField.QtRendering
+     cursorVisible: !readOnly
+     verticalAlignment: TextInput.AlignVCenter
+ 
+diff --git a/shell/modules/bar/popouts/Notes.qml b/shell/modules/bar/popouts/Notes.qml
+index f02e2de5..192bd582 100644
+--- a/shell/modules/bar/popouts/Notes.qml
++++ b/shell/modules/bar/popouts/Notes.qml
+@@ -457,7 +457,7 @@ ColumnLayout {
+                 selectByMouse: true
+                 selectionColor: Qt.alpha(Colours.palette.m3primary, 0.4)
+                 selectedTextColor: color
+-                renderType: TextEdit.NativeRendering
++                renderType: TextEdit.QtRendering
+                 persistentSelection: true
+                 onTextChanged: {
+                     if (activeFocus)
+@@ -573,7 +573,7 @@ ColumnLayout {
+                                 selectByMouse: true
+                                 selectionColor: Qt.alpha(Colours.palette.m3primary, 0.4)
+                                 selectedTextColor: color
+-                                renderType: TextInput.NativeRendering
++                                renderType: TextInput.QtRendering
+ 
+                                 onAccepted: commitItem()
+                                 onEditingFinished: commitItem()
+diff --git a/shell/modules/dashboard/NotesTab.qml b/shell/modules/dashboard/NotesTab.qml
+index 48646ad9..dabdc8d7 100644
+--- a/shell/modules/dashboard/NotesTab.qml
++++ b/shell/modules/dashboard/NotesTab.qml
+@@ -476,7 +476,7 @@ Item {
+                         selectByMouse: true
+                         selectionColor: Qt.alpha(Colours.palette.m3primary, 0.4)
+                         selectedTextColor: color
+-                        renderType: TextEdit.NativeRendering
++                        renderType: TextEdit.QtRendering
+                         persistentSelection: true
+                         onTextChanged: {
+                             if (activeFocus)
+@@ -571,7 +571,7 @@ Item {
+                                         selectByMouse: true
+                                         selectionColor: Qt.alpha(Colours.palette.m3primary, 0.4)
+                                         selectedTextColor: color
+-                                        renderType: TextInput.NativeRendering
++                                        renderType: TextInput.QtRendering
+ 
+                                         onAccepted: commitItem()
+                                         onEditingFinished: commitItem()
+-- 
+2.56.1
+

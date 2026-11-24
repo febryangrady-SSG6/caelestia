@@ -1,0 +1,9 @@
+[SddmGreeterTheme]
+Name=Caelestia Lockscreen
+Description=Standard grey Caelestia theme matching the KDE lockscreen
+Author=caelestia-kde
+License=GPL-3.0-or-later
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+QtVersion=6

@@ -1,0 +1,103 @@
+From 679c3c63d6f46bdfb6f91e393ba49cd6938df981 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 00:22:00 +0700
+Subject: [PATCH 36/47] fix(bar): prevent popout open and close animations from
+ leaving a gap above the bar
+
+---
+ shell/modules/bar/popouts/ClipWrapper.qml | 13 ++++++++-----
+ shell/modules/bar/popouts/Wrapper.qml     |  4 ++--
+ shell/modules/drawers/ContentWindow.qml   | 10 +++++-----
+ 3 files changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/ClipWrapper.qml b/shell/modules/bar/popouts/ClipWrapper.qml
+index 495a24fe..b36075bd 100644
+--- a/shell/modules/bar/popouts/ClipWrapper.qml
++++ b/shell/modules/bar/popouts/ClipWrapper.qml
+@@ -61,6 +61,7 @@ Item {
+     readonly property real lampScaleX: (isLampActive && isHorizontal && content.nonAnimWidth > 0) ? (width / content.nonAnimWidth) : 1
+     readonly property real lampScaleY: (isLampActive && !isHorizontal && content.nonAnimHeight > 0) ? (height / content.nonAnimHeight) : 1
+ 
++    readonly property real clampedOffsetScale: Math.max(0, offsetScale)
+     // Where x is heading; x itself animates towards it.
+     readonly property real targetX: {
+         if (content.isDetached)
+@@ -142,7 +143,9 @@ Item {
+     }
+ 
+     Behavior on offsetScale {
+-        Anim {}
++        Anim {
++            type: Anim.DefaultEffects
++        }
+     }
+ 
+     Behavior on x {
+@@ -193,10 +196,10 @@ Item {
+         isPanelHorizontal: root.isHorizontal
+         underSidebar: root.activePanel === root.bar && (!root.isHorizontal || content.currentCenter - root.parent.leftMargin >= root.parent.width - Visibilities.sidebarWidthFor(Tokens.sizes.sidebar.width))
+ 
+-        anchors.leftMargin: root.activePanel.position === "left" ? (-implicitWidth - 5) * root.offsetScale : 0
+-        anchors.rightMargin: root.activePanel.position === "right" ? (-implicitWidth - 5) * root.offsetScale : 0
+-        anchors.topMargin: root.activePanel.position === "top" ? (-implicitHeight - 5) * root.offsetScale : 0
+-        anchors.bottomMargin: root.activePanel.position === "bottom" ? (-implicitHeight - 5) * root.offsetScale : 0
++        anchors.leftMargin: root.activePanel.position === "left" ? (-implicitWidth - 5) * root.clampedOffsetScale : 0
++        anchors.rightMargin: root.activePanel.position === "right" ? (-implicitWidth - 5) * root.clampedOffsetScale : 0
++        anchors.topMargin: root.activePanel.position === "top" ? (-implicitHeight - 5) * root.clampedOffsetScale : 0
++        anchors.bottomMargin: root.activePanel.position === "bottom" ? (-implicitHeight - 5) * root.clampedOffsetScale : 0
+ 
+         transform: Scale {
+             xScale: root.lampScaleX
+diff --git a/shell/modules/bar/popouts/Wrapper.qml b/shell/modules/bar/popouts/Wrapper.qml
+index 29b7db34..029ccf27 100644
+--- a/shell/modules/bar/popouts/Wrapper.qml
++++ b/shell/modules/bar/popouts/Wrapper.qml
+@@ -126,7 +126,7 @@ Item {
+     Comp {
+         id: content
+ 
+-        shouldBeActive: root.hasCurrent && !root.detachedMode
++        shouldBeActive: (root.hasCurrent || root.offsetScale < 1) && !root.detachedMode
+         anchors.fill: parent
+         sourceComponent: Content {
+             popouts: popoutState
+@@ -154,7 +154,7 @@ Item {
+         }
+     }
+     Behavior on implicitHeight {
+-        enabled: root.offsetScale < 1
++        enabled: root.hasCurrent && root.offsetScale < 1
+ 
+         Anim {
+             duration: root.animLength
+diff --git a/shell/modules/drawers/ContentWindow.qml b/shell/modules/drawers/ContentWindow.qml
+index e937f37c..f51a325c 100644
+--- a/shell/modules/drawers/ContentWindow.qml
++++ b/shell/modules/drawers/ContentWindow.qml
+@@ -583,7 +583,7 @@ StyledWindow {
+             group: popoutBg.shown ? blobGroup : null
+ 
+             panel: panels.popoutsWrapper
+-            deformAmount: connectedToSidebar ? 0.03 : (panels.popouts.isDetached ? 0.05 : panels.popouts.hasCurrent ? 0.15 : 0.1)
++            deformAmount: 0
+             exclude: connectedToSidebar ? [sidebarBg] : []
+             x: {
+                 const shift = activePanel.isIsland ? 0 : extraShift;
+@@ -1103,10 +1103,10 @@ StyledWindow {
+             // as the box being split across its middle.
+             target: popoutBg.ownsSurface ? null : panels.popoutsWrapper
+             contentItem: root.contentItem
+-            blurOffsetTop: root.blurOffsetTop - (popoutBg.connectedToSidebar ? Tokens.spacing.extraLarge + 10 + Tokens.rounding.extraLarge : 0)
+-            blurOffsetBottom: root.blurOffsetBottom
+-            blurOffsetLeft: root.blurOffsetLeft
+-            blurOffsetRight: root.blurOffsetRight
++            blurOffsetTop: root.blurOffsetTop - (popoutBg.connectedToSidebar ? Tokens.spacing.extraLarge + 10 + Tokens.rounding.extraLarge : 0) - (bar.position === "top" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
++            blurOffsetBottom: root.blurOffsetBottom - (bar.position === "bottom" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
++            blurOffsetLeft: root.blurOffsetLeft - (bar.position === "left" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
++            blurOffsetRight: root.blurOffsetRight - (bar.position === "right" && !GlobalConfig.appearance.islands ? Tokens.padding.extraLarge * 2 : 0)
+             vAnchor: panels.popoutsWrapper.vAnchor
+             hAnchor: panels.popoutsWrapper.hAnchor
+             offsetScale: panels.popoutsWrapper.offsetScale
+-- 
+2.56.1
+

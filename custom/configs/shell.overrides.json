@@ -1,0 +1,39 @@
+{
+    "ai": {
+        "defaultProvider": "antigravity"
+    },
+    "bar": {
+        "dock": {
+            "iconSize": 48
+        },
+        "greeter": {
+            "afternoonGif": "root:/assets/bongocat.gif",
+            "eveningGif": "root:/assets/kurukuru.gif",
+            "mode": "timeOfDay",
+            "morningGif": "root:/assets/bongocat.gif",
+            "nightGif": "root:/assets/kurukuru.gif",
+            "showOnHover": false
+        }
+    },
+    "general": {
+        "apps": {
+            "browser": [
+                "helium-browser"
+            ],
+            "terminal": [
+                "konsole"
+            ]
+        }
+    },
+    "launcher": {
+        "hiddenApps": [
+            "foot",
+            "footclient",
+            "foot-server",
+            "systemsettings"
+        ]
+    },
+    "paths": {
+        "mediaGif": "root:/assets/kurukuru.gif"
+    }
+}

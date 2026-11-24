@@ -1,0 +1,491 @@
+From a466403e3699b31572dd88b66acd0530f2ed7a79 Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Mon, 16 Nov 2026 01:56:34 +0700
+Subject: [PATCH 15/47] feat(session): add Sleep, action confirmations,
+ hibernate toggle, and GIF selector
+
+---
+ shell/modules/nexus/PageRowIndex.qml      |  20 ++
+ shell/modules/nexus/pages/SessionPage.qml |  72 ++++++-
+ shell/modules/session/Content.qml         | 231 ++++++++++++++++++----
+ shell/services/SessionOptions.qml         |  19 ++
+ 4 files changed, 298 insertions(+), 44 deletions(-)
+ create mode 100644 shell/services/SessionOptions.qml
+
+diff --git a/shell/modules/nexus/PageRowIndex.qml b/shell/modules/nexus/PageRowIndex.qml
+index e56fe773..9aad9b51 100644
+--- a/shell/modules/nexus/PageRowIndex.qml
++++ b/shell/modules/nexus/PageRowIndex.qml
+@@ -2847,6 +2847,26 @@ QtObject {
+             pageIdx: 7,
+             subPage: "session"
+         },
++        {
++            label: qsTr("Show hibernate"),
++            description: qsTr("Display the Hibernate button in the session menu (turn off to disable)"),
++            section: qsTr("Session"),
++            pageIdx: 7,
++            subPage: "session"
++        },
++        {
++            label: qsTr("Session GIF"),
++            description: qsTr("Animated GIF shown in the session menu (%1)"),
++            section: qsTr("Session"),
++            pageIdx: 7,
++            subPage: "session"
++        },
++        {
++            label: qsTr("Custom session GIF"),
++            section: qsTr("Session"),
++            pageIdx: 7,
++            subPage: "session"
++        },
+         {
+             label: qsTr("Enabled"),
+             description: qsTr("Pixels dragged before the sidebar opens"),
+diff --git a/shell/modules/nexus/pages/SessionPage.qml b/shell/modules/nexus/pages/SessionPage.qml
+index 6ead4331..0b391431 100644
+--- a/shell/modules/nexus/pages/SessionPage.qml
++++ b/shell/modules/nexus/pages/SessionPage.qml
+@@ -5,12 +5,31 @@ import QtQuick.Layouts
+ import Caelestia.Config
+ import qs.components
+ import qs.components.controls
++import qs.components.filedialog
+ import qs.services
+ import qs.modules.nexus.common
+ 
+ PageBase {
+     id: root
+ 
++    readonly property list<MenuItem> sessionGifItems: [
++        MenuItem {
++            icon: "cruelty_free"
++            text: qsTr("Dino")
++            value: "root:/assets/dino.gif"
++        },
++        MenuItem {
++            icon: "animation"
++            text: qsTr("Kuru Kuru")
++            value: "root:/assets/kurukuru.gif"
++        },
++        MenuItem {
++            icon: "pets"
++            text: qsTr("Bongo Cat")
++            value: "root:/assets/bongocat.gif"
++        }
++    ]
++
+     function commandString(list: var): string {
+         return (list || []).join(" ");
+     }
+@@ -52,7 +71,6 @@ PageBase {
+         }
+ 
+         StepperRow {
+-            last: true
+             label: qsTr("Drag threshold")
+             subtext: qsTr("Pixels to drag before the menu moves")
+             reset: ({ node: GlobalConfig.session, setting: "dragThreshold" })
+@@ -63,6 +81,58 @@ PageBase {
+             onMoved: v => GlobalConfig.session.dragThreshold = v
+         }
+ 
++        ToggleRow {
++            Layout.fillWidth: true
++            text: qsTr("Show hibernate")
++            subtext: qsTr("Display the Hibernate button in the session menu (turn off to disable)")
++            reset: ({
++                customGet: () => SessionOptions.showHibernate,
++                customDef: true,
++                customSet: v => SessionOptions.showHibernate = v
++            })
++            checked: SessionOptions.showHibernate
++            onToggled: SessionOptions.showHibernate = checked
++        }
++
++        SelectRow {
++            id: sessionGifSelect
++
++            Layout.fillWidth: true
++            label: qsTr("Session GIF")
++            subtext: qsTr("Animated GIF shown in the session menu (%1)").arg((Config.paths.sessionGif || "root:/assets/dino.gif").split("/").pop())
++            active: root.sessionGifItems.find(item => item.value === Config.paths.sessionGif) ?? null
++            fallbackText: qsTr("Custom")
++            fallbackIcon: "image"
++            menuItems: root.sessionGifItems
++            onSelected: item => {
++                GlobalConfig.paths.sessionGif = item.value;
++                GlobalConfig.save();
++                active = Qt.binding(() => root.sessionGifItems.find(i => i.value === Config.paths.sessionGif) ?? null);
++            }
++        }
++
++        NavRow {
++            last: true
++            Layout.fillWidth: true
++            icon: "folder_open"
++            label: qsTr("Custom session GIF")
++            status: Config.paths.sessionGif ? Config.paths.sessionGif.split("/").pop() : qsTr("Default (dino.gif)")
++            onClicked: sessionGifDialog.open()
++
++            FileDialog {
++                id: sessionGifDialog
++
++                title: qsTr("Select Session GIF")
++                filterLabel: qsTr("Images and GIFs (*.gif, *.webp, *.png, *.apng, *.jpg)")
++                filters: ["gif", "webp", "png", "apng", "jpg", "jpeg"]
++                onAccepted: path => {
++                    GlobalConfig.paths.sessionGif = path;
++                    GlobalConfig.save();
++                    sessionGifSelect.active = Qt.binding(() => root.sessionGifItems.find(i => i.value === Config.paths.sessionGif) ?? null);
++                }
++            }
++        }
++
+         SectionHeader {
+             text: qsTr("Icons")
+         }
+diff --git a/shell/modules/session/Content.qml b/shell/modules/session/Content.qml
+index 53bd6026..5f9ca953 100644
+--- a/shell/modules/session/Content.qml
++++ b/shell/modules/session/Content.qml
+@@ -1,6 +1,8 @@
+ pragma ComponentBehavior: Bound
+ 
+ import QtQuick
++import QtQuick.Controls
++import QtQuick.Layouts
+ import Quickshell
+ import Caelestia
+ import Caelestia.Config
+@@ -16,16 +18,44 @@ Column {
+ 
+     required property DrawerVisibilities visibilities
+ 
++    function runCommand(command: list<string>): void {
++        root.visibilities.session = false;
++        if (!SessionManager.exec(command))
++            Quickshell.execDetached(command);
++    }
++
++    function requestConfirmation(title: string, message: string, confirmText: string, destructive: bool, command: list<string>, sourceButton: Item): void {
++        sessionConfirmPopup.confirmTitle = title;
++        sessionConfirmPopup.confirmMessage = message;
++        sessionConfirmPopup.confirmText = confirmText;
++        sessionConfirmPopup.destructive = destructive;
++        sessionConfirmPopup.pendingCommand = command;
++        sessionConfirmPopup.returnFocusTarget = sourceButton;
++        sessionConfirmPopup.open();
++    }
++
+     padding: Tokens.padding.large
+     rightPadding: CUtils.clamp(padding - Config.border.thickness, 0, padding)
+     spacing: Tokens.spacing.large
+ 
++    Connections {
++        function onSessionChanged(): void {
++            if (!root.visibilities.session)
++                sessionConfirmPopup.close();
++        }
++
++        target: root.visibilities
++    }
++
+     SessionButton {
+         id: logout
+ 
+         label: qsTr("Log out")
+         icon: Config.session.icons.logout
+         command: ["sh", "-c", "qdbus6 org.kde.Shutdown /Shutdown org.kde.Shutdown.logout 2>/dev/null"]
++        confirm: true
++        confirmTitle: qsTr("Log out?")
++        confirmMessage: qsTr("Your current desktop session will end and unsaved work may be lost.")
+ 
+         KeyNavigation.down: shutdown
+ 
+@@ -47,12 +77,19 @@ Column {
+         label: qsTr("Shut down")
+         icon: Config.session.icons.shutdown
+         command: Config.session.commands.shutdown
++        confirm: true
++        destructive: true
++        confirmTitle: qsTr("Shut down computer?")
++        confirmMessage: qsTr("All open apps will close and the system will power off.")
+ 
+         KeyNavigation.up: logout
+-        KeyNavigation.down: hibernate
++        KeyNavigation.down: sleep
+     }
+ 
+     Item {
++        readonly property string resolvedGif: Config.paths.sessionGif || "root:/assets/dino.gif"
++        readonly property bool isMonoDino: resolvedGif.endsWith("/dino.gif")
++
+         width: Tokens.sizes.session.button
+         height: Tokens.sizes.session.button
+ 
+@@ -62,65 +99,45 @@ Column {
+             playing: visible
+             asynchronous: true
+             speed: Config.general.sessionGifSpeed
+-            source: Paths.absolutePath(Config.paths.sessionGif)
+-            fillMode: AnimatedImage.PreserveAspectFit
+-            opacity: GlobalConfig.general.caelestiaMode ? 0 : 1
+-
+-            Behavior on opacity { Anim { type: Anim.Standard } }
+-
+-            visible: Config.paths.sessionGif !== ""
+-        }
+-
+-        AnimatedImage {
+-            anchors.fill: parent
+-            sourceSize.width: width * ((QsWindow.window as QsWindow)?.devicePixelRatio ?? 1)
+-            playing: visible
+-            asynchronous: true
+-            speed: Config.general.sessionGifSpeed
+-            source: Paths.absolutePath("root:/assets/dino.gif")
++            source: Paths.absolutePath(parent.resolvedGif)
+             fillMode: AnimatedImage.PreserveAspectFit
+-            opacity: GlobalConfig.general.caelestiaMode ? 1 : 0
+-
+-            Behavior on opacity { Anim { type: Anim.Standard } }
+-
+-            layer.enabled: true
+ 
++            layer.enabled: parent.isMonoDino
+             layer.effect: Colouriser {
+                 colorizationColor: Colours.palette.m3onSurface
+                 sourceColor: "white"
+             }
+         }
++    }
+ 
+-        AnimatedImage {
+-            anchors.fill: parent
+-            sourceSize.width: width * ((QsWindow.window as QsWindow)?.devicePixelRatio ?? 1)
+-            playing: visible
+-            asynchronous: true
+-            speed: Config.general.sessionGifSpeed
+-            source: Paths.absolutePath("root:/assets/dino.gif")
+-            fillMode: AnimatedImage.PreserveAspectFit
+-            opacity: GlobalConfig.general.caelestiaMode ? 1 : 0
+-
+-            Behavior on opacity { Anim { type: Anim.Standard } }
++    SessionButton {
++        id: sleep
+ 
+-            layer.enabled: true
++        label: qsTr("Sleep")
++        icon: "bedtime"
++        command: ["suspend"]
+ 
+-            layer.effect: Colouriser {
+-                colorizationColor: Colours.palette.m3onSurface
+-                sourceColor: "white"
+-            }
+-        }
++        KeyNavigation.up: shutdown
++        KeyNavigation.down: SessionOptions.showHibernate ? hibernate : reboot
+     }
+ 
+     SessionButton {
+         id: hibernate
+ 
++        visible: SessionOptions.showHibernate
+         label: qsTr("Hibernate")
+         icon: Config.session.icons.hibernate
+         command: Config.session.commands.hibernate
++        confirm: true
++        confirmTitle: qsTr("Hibernate computer?")
++        confirmMessage: qsTr("Your session will be saved to disk and the system will power off.")
+ 
+-        KeyNavigation.up: shutdown
++        KeyNavigation.up: sleep
+         KeyNavigation.down: reboot
++        onVisibleChanged: {
++            if (!visible && activeFocus)
++                reboot.forceActiveFocus();
++        }
+     }
+ 
+     SessionButton {
+@@ -129,8 +146,130 @@ Column {
+         label: qsTr("Restart")
+         icon: Config.session.icons.reboot
+         command: Config.session.commands.reboot
++        confirm: true
++        confirmTitle: qsTr("Restart computer?")
++        confirmMessage: qsTr("All open apps will close and the system will reboot.")
++
++        KeyNavigation.up: SessionOptions.showHibernate ? hibernate : sleep
++    }
++
++    Popup {
++        id: sessionConfirmPopup
++
++        property string confirmTitle
++        property string confirmMessage
++        property string confirmText
++        property bool destructive
++        property list<string> pendingCommand: []
++        property Item returnFocusTarget: null
++
++        parent: Overlay.overlay
++        modal: true
++        focus: true
++        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
++
++        x: parent ? Math.round((parent.width - width) / 2) : 0
++        y: parent ? Math.round((parent.height - height) / 2) : 0
++        padding: root.Tokens.padding.large
++
++        enter: Transition {
++            NumberAnimation {
++                property: "opacity"
++                from: 0
++                to: 1
++                duration: root.Tokens.anim.durations.expressiveDefaultEffects
++                easing: root.Tokens.anim.expressiveDefaultEffects
++            }
++            NumberAnimation {
++                property: "scale"
++                from: 0.88
++                to: 1
++                duration: root.Tokens.anim.durations.expressiveFastSpatial
++                easing: root.Tokens.anim.expressiveFastSpatial
++            }
++        }
++
++        exit: Transition {
++            NumberAnimation {
++                property: "opacity"
++                from: 1
++                to: 0
++                duration: root.Tokens.anim.durations.expressiveFastEffects
++                easing: root.Tokens.anim.expressiveFastEffects
++            }
++            NumberAnimation {
++                property: "scale"
++                from: 1
++                to: 0.92
++                duration: root.Tokens.anim.durations.expressiveFastEffects
++                easing: root.Tokens.anim.expressiveFastEffects
++            }
++        }
+ 
+-        KeyNavigation.up: hibernate
++        onClosed: {
++            if (root.visibilities.session)
++                (returnFocusTarget && returnFocusTarget.visible ? returnFocusTarget : logout).forceActiveFocus();
++        }
++
++        contentItem: ColumnLayout {
++            spacing: root.Tokens.spacing.medium
++
++            StyledText {
++                Layout.fillWidth: true
++                Layout.maximumWidth: 320
++                text: sessionConfirmPopup.confirmTitle
++                font: root.Tokens.font.body.builders.large.weight(Font.Medium).build()
++            }
++
++            StyledText {
++                Layout.fillWidth: true
++                Layout.maximumWidth: 320
++                text: sessionConfirmPopup.confirmMessage
++                color: Colours.palette.m3onSurfaceVariant
++                font: root.Tokens.font.body.small
++                wrapMode: Text.Wrap
++            }
++
++            RowLayout {
++                Layout.alignment: Qt.AlignRight
++                spacing: root.Tokens.spacing.small
++
++                TextButton {
++                    text: qsTr("Cancel")
++                    onClicked: sessionConfirmPopup.close()
++                }
++
++                TextButton {
++                    text: sessionConfirmPopup.confirmText
++                    type: TextButton.Filled
++                    inactiveColour: sessionConfirmPopup.destructive ? Colours.palette.m3error : Colours.palette.m3primary
++                    inactiveOnColour: sessionConfirmPopup.destructive ? Colours.palette.m3onError : Colours.palette.m3onPrimary
++                    onClicked: {
++                        const cmd = sessionConfirmPopup.pendingCommand;
++                        sessionConfirmPopup.close();
++                        root.runCommand(cmd);
++                    }
++                }
++            }
++        }
++
++        background: Item {
++            Elevation {
++                anchors.fill: sessionBgRect
++                level: 3
++                radius: sessionBgRect.radius
++            }
++
++            StyledRect {
++                id: sessionBgRect
++
++                anchors.fill: parent
++                radius: root.Tokens.rounding.large
++                color: Colours.palette.m3surfaceContainerHigh
++                border.width: 1
++                border.color: Colours.palette.m3outlineVariant
++            }
++        }
+     }
+ 
+     component SessionButton: ButtonBase {
+@@ -139,10 +278,16 @@ Column {
+         required property list<string> command
+         required property string label
+         property string icon
++        property bool confirm: false
++        property string confirmTitle: label
++        property string confirmMessage
++        property bool destructive: false
+ 
+         function exec(): void {
+-            if (!SessionManager.exec(command))
+-                Quickshell.execDetached(command);
++            if (confirm)
++                root.requestConfirmation(confirmTitle, confirmMessage, label, destructive, command, button);
++            else
++                root.runCommand(command);
+         }
+ 
+         implicitWidth: Tokens.sizes.session.button
+diff --git a/shell/services/SessionOptions.qml b/shell/services/SessionOptions.qml
+new file mode 100644
+index 00000000..65f4c07d
+--- /dev/null
++++ b/shell/services/SessionOptions.qml
+@@ -0,0 +1,19 @@
++pragma Singleton
++
++import QtCore
++import Quickshell
++
++// Persists session drawer options outside the compiled C++ SessionConfig schema.
++Singleton {
++    id: root
++
++    property alias showHibernate: sessionSettings.showHibernate
++
++    Settings {
++        id: sessionSettings
++
++        property bool showHibernate: true
++
++        category: "Session"
++    }
++}
+-- 
+2.56.1
+

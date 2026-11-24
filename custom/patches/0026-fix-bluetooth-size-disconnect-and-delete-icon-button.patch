@@ -1,0 +1,59 @@
+From 9c3d50e7eab05ed6aa3e8c26075247bcc68b26fb Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 21:21:02 +0700
+Subject: [PATCH 26/47] fix(bluetooth): size disconnect and delete icon buttons
+ properly in popout
+
+---
+ shell/modules/bar/popouts/Bluetooth.qml | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/shell/modules/bar/popouts/Bluetooth.qml b/shell/modules/bar/popouts/Bluetooth.qml
+index 42419683..2f1cb0ca 100644
+--- a/shell/modules/bar/popouts/Bluetooth.qml
++++ b/shell/modules/bar/popouts/Bluetooth.qml
+@@ -148,8 +148,10 @@ ColumnLayout {
+                         Item {
+                             id: connectBtn
+ 
+-                            Layout.preferredWidth: Tokens.font.icon.medium.pointSize * root.scaleOffset
+-                            Layout.preferredHeight: width
++                            implicitWidth: Math.max(connectIcon.implicitWidth, Tokens.font.icon.medium.pointSize * root.scaleOffset)
++                            implicitHeight: Math.max(connectIcon.implicitHeight, Tokens.font.icon.medium.pointSize * root.scaleOffset)
++                            Layout.preferredWidth: implicitWidth
++                            Layout.preferredHeight: implicitHeight
+                             visible: device.modelData.state === BluetoothDeviceState.Connected || device.loading
+ 
+                             CircularIndicator {
+@@ -158,6 +160,8 @@ ColumnLayout {
+                             }
+ 
+                             MaterialIcon {
++                                id: connectIcon
++
+                                 anchors.centerIn: parent
+                                 animate: true
+                                 text: device.modelData.state === BluetoothDeviceState.Connected ? "link_off" : "link"
+@@ -172,8 +176,8 @@ ColumnLayout {
+                             asynchronous: true
+                             active: device.modelData.bonded
+                             sourceComponent: Item {
+-                                implicitWidth: connectBtn.implicitWidth
+-                                implicitHeight: connectBtn.implicitHeight
++                                implicitWidth: Math.max(deleteIcon.implicitWidth, connectBtn.implicitWidth)
++                                implicitHeight: Math.max(deleteIcon.implicitHeight, connectBtn.implicitHeight)
+ 
+                                 StateLayer {
+                                     radius: Tokens.rounding.full * root.scaleOffset
+@@ -181,6 +185,8 @@ ColumnLayout {
+                                 }
+ 
+                                 MaterialIcon {
++                                    id: deleteIcon
++
+                                     anchors.centerIn: parent
+                                     text: "delete"
+                                     fontStyle.pointSize: Tokens.font.icon.medium.pointSize * root.fontScale
+-- 
+2.56.1
+

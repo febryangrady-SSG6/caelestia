@@ -1,0 +1,863 @@
+From 90d9b0ba4fedef2f9eee2dcb9eefe6391b2822be Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sun, 22 Nov 2026 02:46:21 +0700
+Subject: [PATCH 39/47] feat(nexus): render native KDecoration3 window buttons
+ synced on startup
+
+---
+ shell/modules/nexus/WindowFactory.qml         |  95 +--
+ .../src/Caelestia/Services/CMakeLists.txt     |   9 +
+ .../Services/kdedecorationbuttons.cpp         | 571 ++++++++++++++++++
+ .../Services/kdedecorationbuttons.hpp         |  97 +++
+ 4 files changed, 710 insertions(+), 62 deletions(-)
+ create mode 100644 shell/plugin/src/Caelestia/Services/kdedecorationbuttons.cpp
+ create mode 100644 shell/plugin/src/Caelestia/Services/kdedecorationbuttons.hpp
+
+diff --git a/shell/modules/nexus/WindowFactory.qml b/shell/modules/nexus/WindowFactory.qml
+index 7f8ad352..48f1419e 100644
+--- a/shell/modules/nexus/WindowFactory.qml
++++ b/shell/modules/nexus/WindowFactory.qml
+@@ -6,6 +6,7 @@ import QtQuick.Window
+ import Quickshell
+ import Quickshell.Wayland
+ import Caelestia.Config
++import Caelestia.Services
+ import qs.components
+ import qs.components.controls
+ import qs.services
+@@ -178,11 +179,15 @@ Singleton {
+                     Item {
+                         id: titleBar
+ 
++                        readonly property real decoHeight: rightDecoButtons.hasButtons
++                            ? rightDecoButtons.implicitHeight
++                            : (leftDecoButtons.hasButtons ? leftDecoButtons.implicitHeight : 36)
++
+                         anchors.top: parent.top
+                         anchors.left: parent.left
+                         anchors.right: parent.right
+-                        height: 36
+-                        implicitHeight: 36
++                        height: decoHeight
++                        implicitHeight: decoHeight
+                         z: 20
+ 
+                         MouseArea {
+@@ -194,10 +199,23 @@ Singleton {
+ 
+                         RowLayout {
+                             anchors.fill: parent
+-                            anchors.leftMargin: Tokens.padding.large
+-                            anchors.rightMargin: Tokens.padding.small
++                            anchors.leftMargin: leftDecoButtons.hasButtons ? 0 : Tokens.padding.large
++                            anchors.rightMargin: rightDecoButtons.hasButtons ? 0 : Tokens.padding.small
+                             spacing: Tokens.spacing.small
+ 
++                            KdeDecorationButtons {
++                                id: leftDecoButtons
++
++                                Layout.alignment: Qt.AlignTop
++                                side: "left"
++                                visible: hasButtons
++                                windowActive: nexus.windowActive
++                                windowMaximized: win.maximized
++                                onMinimizeRequested: win.minimized = true
++                                onMaximizeRequested: win.maximized = !win.maximized
++                                onCloseRequested: win.visible = false
++                            }
++
+                             MaterialIcon {
+                                 text: PageRegistry.pages[nexus.nState.currentPageIdx]?.icon ?? "settings"
+                                 color: Colours.palette.m3onSurfaceVariant
+@@ -212,64 +230,17 @@ Singleton {
+                                 elide: Text.ElideRight
+                             }
+ 
+-                            Item {
+-                                id: minBtn
+-
+-                                implicitWidth: 28
+-                                implicitHeight: 28
+-
+-                                StateLayer {
+-                                    radius: Tokens.rounding.full
+-                                    onClicked: win.minimized = true
+-                                }
+-
+-                                MaterialIcon {
+-                                    anchors.centerIn: parent
+-                                    text: "remove"
+-                                    color: Colours.palette.m3onSurfaceVariant
+-                                    fontStyle: Tokens.font.icon.small
+-                                }
+-                            }
+-
+-                            Item {
+-                                id: maxBtn
+-
+-                                implicitWidth: 28
+-                                implicitHeight: 28
+-
+-                                StateLayer {
+-                                    radius: Tokens.rounding.full
+-                                    onClicked: win.maximized = !win.maximized
+-                                }
+-
+-                                MaterialIcon {
+-                                    anchors.centerIn: parent
+-                                    text: win.maximized ? "filter_none" : "crop_square"
+-                                    color: Colours.palette.m3onSurfaceVariant
+-                                    fontStyle: Tokens.font.icon.small
+-                                }
+-                            }
+-
+-                            Item {
+-                                id: closeBtn
+-
+-                                implicitWidth: 28
+-                                implicitHeight: 28
+-
+-                                StateLayer {
+-                                    id: closeState
+-
+-                                    radius: Tokens.rounding.full
+-                                    color: Colours.palette.m3error
+-                                    onClicked: win.visible = false
+-                                }
+-
+-                                MaterialIcon {
+-                                    anchors.centerIn: parent
+-                                    text: "close"
+-                                    color: closeState.containsMouse ? Colours.palette.m3error : Colours.palette.m3onSurfaceVariant
+-                                    fontStyle: Tokens.font.icon.small
+-                                }
++                            KdeDecorationButtons {
++                                id: rightDecoButtons
++
++                                Layout.alignment: Qt.AlignTop
++                                side: "right"
++                                visible: hasButtons
++                                windowActive: nexus.windowActive
++                                windowMaximized: win.maximized
++                                onMinimizeRequested: win.minimized = true
++                                onMaximizeRequested: win.maximized = !win.maximized
++                                onCloseRequested: win.visible = false
+                             }
+                         }
+                     }
+diff --git a/shell/plugin/src/Caelestia/Services/CMakeLists.txt b/shell/plugin/src/Caelestia/Services/CMakeLists.txt
+index dfe862ef..8cde22ba 100644
+--- a/shell/plugin/src/Caelestia/Services/CMakeLists.txt
++++ b/shell/plugin/src/Caelestia/Services/CMakeLists.txt
+@@ -1,5 +1,8 @@
+ find_package(KF6GlobalAccel REQUIRED)
+ find_package(KF6Config REQUIRED)
++find_package(KF6CoreAddons REQUIRED)
++find_package(KF6ColorScheme REQUIRED)
++find_package(KDecoration3 REQUIRED)
+ find_package(KF6NetworkManagerQt REQUIRED)
+ find_package(X11 REQUIRED)
+ # For QPlatformNativeInterface, the only way to reach a QWindow's wl_surface:
+@@ -107,6 +110,8 @@ qml_module(caelestia-services
+         NmQt.hpp
+         HotspotController.cpp
+         HotspotController.hpp
++        kdedecorationbuttons.cpp
++        kdedecorationbuttons.hpp
+     LIBRARIES
+         Qt::Concurrent
+         Qt::DBus
+@@ -117,6 +122,10 @@ qml_module(caelestia-services
+         Qt::WaylandClient
+         KF6::GlobalAccel
+         KF6::ConfigCore
++        KF6::CoreAddons
++        KF6::ColorScheme
++        KDecoration3::KDecoration
++        KDecoration3::KDecoration3Private
+         X11::X11
+         PkgConfig::Pipewire
+         PkgConfig::Aubio
+diff --git a/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.cpp b/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.cpp
+new file mode 100644
+index 00000000..322fdb67
+--- /dev/null
++++ b/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.cpp
+@@ -0,0 +1,571 @@
++// SPDX-License-Identifier: GPL-3.0-only
++#include "kdedecorationbuttons.hpp"
++
++#include <QCoreApplication>
++#include <QDBusConnection>
++#include <QDir>
++#include <QFileInfo>
++#include <QHoverEvent>
++#include <QJsonObject>
++#include <QMouseEvent>
++#include <QPainter>
++#include <QStandardPaths>
++
++#include <KColorScheme>
++#include <KConfigGroup>
++#include <KPluginFactory>
++#include <KPluginMetaData>
++#include <KSharedConfig>
++
++#include <KDecoration3/DecoratedWindow>
++#include <KDecoration3/DecorationButtonGroup>
++#include <KDecoration3/Private/DecoratedWindowPrivate>
++#include <KDecoration3/Private/DecorationBridge>
++#include <KDecoration3/Private/DecorationSettingsPrivate>
++
++#include <algorithm>
++#include <cmath>
++
++using namespace KDecoration3;
++
++namespace caelestia::services {
++
++class KdeDecoSettings : public DecorationSettingsPrivateV2 {
++public:
++    explicit KdeDecoSettings(DecorationSettings* parent, KdeDecorationButtons* owner)
++        : DecorationSettingsPrivateV2(parent)
++        , m_owner(owner) {}
++
++    bool isOnAllDesktopsAvailable() const override { return true; }
++    bool isAlphaChannelSupported() const override { return true; }
++    bool isCloseOnDoubleClickOnMenu() const override { return false; }
++    bool isAlwaysShowExcludeFromCapture() const override { return false; }
++
++    QList<DecorationButtonType> decorationButtonsLeft() const override {
++        return m_owner ? m_owner->activeButtonsLeft() : QList<DecorationButtonType>{};
++    }
++
++    QList<DecorationButtonType> decorationButtonsRight() const override {
++        return m_owner ? m_owner->activeButtonsRight() : QList<DecorationButtonType>{};
++    }
++
++    BorderSize borderSize() const override {
++        return m_owner ? m_owner->activeBorderSize() : BorderSize::Normal;
++    }
++
++private:
++    QPointer<KdeDecorationButtons> m_owner;
++};
++
++class KdeDecoWindow : public DecoratedWindowPrivateV4 {
++public:
++    explicit KdeDecoWindow(DecoratedWindow* client, Decoration* decoration, KdeDecorationButtons* owner)
++        : DecoratedWindowPrivateV4(client, decoration)
++        , m_owner(owner) {}
++
++    bool isActive() const override { return m_owner ? m_owner->windowActive() : true; }
++    QString caption() const override { return QString(); }
++    bool isOnAllDesktops() const override { return false; }
++    bool isShaded() const override { return false; }
++    QIcon icon() const override { return QIcon(); }
++    bool isMaximized() const override { return m_owner ? m_owner->windowMaximized() : false; }
++    bool isMaximizedHorizontally() const override { return isMaximized(); }
++    bool isMaximizedVertically() const override { return isMaximized(); }
++    bool isKeepAbove() const override { return false; }
++    bool isKeepBelow() const override { return false; }
++
++    bool isCloseable() const override { return true; }
++    bool isMaximizeable() const override { return true; }
++    bool isMinimizeable() const override { return true; }
++    bool providesContextHelp() const override { return false; }
++    bool isModal() const override { return false; }
++    bool isShadeable() const override { return false; }
++    bool isMoveable() const override { return true; }
++    bool isResizeable() const override { return true; }
++
++    qreal width() const override { return 360.0; }
++    qreal height() const override { return 80.0; }
++    QSizeF size() const override { return QSizeF(360.0, 80.0); }
++    QPalette palette() const override {
++        return KColorScheme::createApplicationPalette(KSharedConfig::openConfig(QStringLiteral("kdeglobals")));
++    }
++    Qt::Edges adjacentScreenEdges() const override { return Qt::Edges(); }
++    qreal scale() const override { return 1.0; }
++    qreal nextScale() const override { return 1.0; }
++
++    void requestShowToolTip(const QString&) override {}
++    void requestHideToolTip() override {}
++    void requestClose() override {
++        if (m_owner)
++            m_owner->notifyCloseRequested();
++    }
++    void requestToggleMaximization(Qt::MouseButtons) override {
++        if (m_owner)
++            m_owner->notifyMaximizeRequested();
++    }
++    void requestMinimize() override {
++        if (m_owner)
++            m_owner->notifyMinimizeRequested();
++    }
++    void requestContextHelp() override {}
++    void requestToggleOnAllDesktops() override {}
++    void requestToggleShade() override {}
++    void requestToggleKeepAbove() override {}
++    void requestToggleKeepBelow() override {}
++    void requestShowWindowMenu(const QRect&) override {}
++
++    QColor color(ColorGroup group, ColorRole role) const override {
++        if (group == ColorGroup::Warning && role == ColorRole::Foreground) {
++            return QColor(QStringLiteral("#da4453"));
++        }
++        const bool act = (group == ColorGroup::Active);
++        if (role == ColorRole::Foreground) {
++            return QColor(act ? QStringLiteral("#eff0f1") : QStringLiteral("#bdc3c7"));
++        }
++        return QColor(act ? QStringLiteral("#202328") : QStringLiteral("#1a1c20"));
++    }
++
++    QString windowClass() const override { return QStringLiteral("quickshell"); }
++    bool hasApplicationMenu() const override { return false; }
++    bool isApplicationMenuActive() const override { return false; }
++    void showApplicationMenu(int) override {}
++    void requestShowApplicationMenu(const QRect&, int) override {}
++    QString applicationMenuServiceName() const override { return QString(); }
++    QString applicationMenuObjectPath() const override { return QString(); }
++    void popup(const Positioner&, QMenu*) override {}
++    bool isExcludedFromCapture() const override { return false; }
++    void requestToggleExcludeFromCapture() override {}
++
++    DecoratedWindow* decoratedWindow() { return window(); }
++
++private:
++    QPointer<KdeDecorationButtons> m_owner;
++};
++
++class KdeDecoBridge : public DecorationBridge {
++public:
++    explicit KdeDecoBridge(KdeDecorationButtons* owner)
++        : DecorationBridge(owner)
++        , m_owner(owner) {}
++
++    std::unique_ptr<DecoratedWindowPrivate> createClient(DecoratedWindow* client, Decoration* decoration) override {
++        auto win = std::make_unique<KdeDecoWindow>(client, decoration, m_owner);
++        m_lastWindow = win.get();
++        return win;
++    }
++
++    std::unique_ptr<DecorationSettingsPrivate> settings(DecorationSettings* parent) override {
++        return std::make_unique<KdeDecoSettings>(parent, m_owner);
++    }
++
++    KdeDecoWindow* lastWindow() const { return m_lastWindow; }
++    void clearLastWindow() { m_lastWindow = nullptr; }
++
++private:
++    QPointer<KdeDecorationButtons> m_owner;
++    KdeDecoWindow* m_lastWindow = nullptr;
++};
++
++namespace {
++
++QList<DecorationButtonType> parseWindowControlButtons(const QString& str) {
++    QList<DecorationButtonType> list;
++    for (const QChar& ch : str) {
++        if (ch == QLatin1Char('I') && !list.contains(DecorationButtonType::Minimize)) {
++            list.append(DecorationButtonType::Minimize);
++        } else if (ch == QLatin1Char('A') && !list.contains(DecorationButtonType::Maximize)) {
++            list.append(DecorationButtonType::Maximize);
++        } else if (ch == QLatin1Char('X') && !list.contains(DecorationButtonType::Close)) {
++            list.append(DecorationButtonType::Close);
++        }
++    }
++    return list;
++}
++
++BorderSize parseBorderSize(const QString& str) {
++    if (str == QLatin1String("None"))
++        return BorderSize::None;
++    if (str == QLatin1String("NoSides"))
++        return BorderSize::NoSides;
++    if (str == QLatin1String("Tiny"))
++        return BorderSize::Tiny;
++    if (str == QLatin1String("Large"))
++        return BorderSize::Large;
++    if (str == QLatin1String("VeryLarge"))
++        return BorderSize::VeryLarge;
++    if (str == QLatin1String("Huge"))
++        return BorderSize::Huge;
++    if (str == QLatin1String("VeryHuge"))
++        return BorderSize::VeryHuge;
++    if (str == QLatin1String("Oversized"))
++        return BorderSize::Oversized;
++    return BorderSize::Normal;
++}
++
++} // namespace
++
++KdeDecorationButtons::KdeDecorationButtons(QQuickItem* parent)
++    : QQuickPaintedItem(parent)
++    , m_bridge(std::make_unique<KdeDecoBridge>(this)) {
++    setAcceptHoverEvents(true);
++    setAcceptedMouseButtons(Qt::LeftButton);
++    setAntialiasing(true);
++}
++
++KdeDecorationButtons::~KdeDecorationButtons() = default;
++
++void KdeDecorationButtons::setSide(const QString& side) {
++    const QString norm = (side == QLatin1String("left")) ? QStringLiteral("left") : QStringLiteral("right");
++    if (m_side == norm)
++        return;
++    m_side = norm;
++    emit sideChanged();
++    if (m_completed)
++        reloadDecoration();
++}
++
++void KdeDecorationButtons::setWindowActive(bool active) {
++    if (m_windowActive == active)
++        return;
++    m_windowActive = active;
++    emit windowActiveChanged();
++    if (auto* w = m_bridge->lastWindow()) {
++        if (auto* dw = w->decoratedWindow())
++            emit dw->activeChanged(active);
++    }
++    update();
++}
++
++void KdeDecorationButtons::setWindowMaximized(bool maximized) {
++    if (m_windowMaximized == maximized)
++        return;
++    m_windowMaximized = maximized;
++    emit windowMaximizedChanged();
++    if (auto* w = m_bridge->lastWindow()) {
++        if (auto* dw = w->decoratedWindow()) {
++            emit dw->maximizedHorizontallyChanged(maximized);
++            emit dw->maximizedVerticallyChanged(maximized);
++            emit dw->maximizedChanged(maximized);
++        }
++    }
++    if (m_decoration) {
++        if (auto st = m_decoration->nextState())
++            m_decoration->apply(st->clone());
++    }
++    for (const auto& b : m_buttons) {
++        if (b && b->type() == DecorationButtonType::Maximize)
++            b->setChecked(maximized);
++    }
++    recalculateBounds();
++}
++
++QList<DecorationButtonType> KdeDecorationButtons::activeButtonsLeft() const {
++    return (m_side == QLatin1String("left")) ? m_buttonsList : QList<DecorationButtonType>{};
++}
++
++QList<DecorationButtonType> KdeDecorationButtons::activeButtonsRight() const {
++    return (m_side == QLatin1String("right")) ? m_buttonsList : QList<DecorationButtonType>{};
++}
++
++void KdeDecorationButtons::notifyMinimizeRequested() {
++    clearHoverState();
++    emit minimizeRequested();
++}
++
++void KdeDecorationButtons::notifyMaximizeRequested() {
++    emit maximizeRequested();
++}
++
++void KdeDecorationButtons::notifyCloseRequested() {
++    clearHoverState();
++    emit closeRequested();
++}
++
++void KdeDecorationButtons::componentComplete() {
++    QQuickPaintedItem::componentComplete();
++    m_completed = true;
++    reloadDecoration();
++}
++
++void KdeDecorationButtons::reloadDecoration() {
++    auto kwinCfg = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
++    KConfigGroup kdecGroup(kwinCfg, QStringLiteral("org.kde.kdecoration2"));
++
++    QString pluginId = kdecGroup.readEntry("library", QStringLiteral("org.kde.breeze"));
++    QString themeName = kdecGroup.readEntry("theme", QString());
++    m_borderSize = parseBorderSize(kdecGroup.readEntry("BorderSize", QStringLiteral("Normal")));
++
++    QString leftStr = kdecGroup.readEntry("ButtonsOnLeft", QStringLiteral("MS"));
++    QString rightStr = kdecGroup.readEntry("ButtonsOnRight", QStringLiteral("HIAX"));
++
++    // If an Aurorae theme is active and custom button positions weren't set in kwinrc,
++    // check the Aurorae theme's own rc file for default LeftButtons / RightButtons.
++    if (themeName.startsWith(QLatin1String("__aurorae__svg__"))
++        && !kdecGroup.hasKey("ButtonsOnLeft") && !kdecGroup.hasKey("ButtonsOnRight")) {
++        const QString auroraeName = themeName.mid(16);
++        const QString rcRel = QStringLiteral("aurorae/themes/") + auroraeName + QLatin1Char('/') + auroraeName + QStringLiteral("rc");
++        const QString rcPath = QStandardPaths::locate(QStandardPaths::GenericDataLocation, rcRel);
++        if (!rcPath.isEmpty()) {
++            auto themeCfg = KSharedConfig::openConfig(rcPath, KConfig::SimpleConfig);
++            KConfigGroup gen(themeCfg, QStringLiteral("General"));
++            if (gen.hasKey("LeftButtons") || gen.hasKey("RightButtons")) {
++                leftStr = gen.readEntry("LeftButtons", QString());
++                rightStr = gen.readEntry("RightButtons", QString());
++            }
++        }
++    }
++
++    QList<DecorationButtonType> leftBtns = parseWindowControlButtons(leftStr);
++    QList<DecorationButtonType> rightBtns = parseWindowControlButtons(rightStr);
++    if (leftBtns.isEmpty() && rightBtns.isEmpty()) {
++        rightBtns = {
++            DecorationButtonType::Minimize,
++            DecorationButtonType::Maximize,
++            DecorationButtonType::Close,
++        };
++    }
++
++    m_buttonsList = (m_side == QLatin1String("left")) ? leftBtns : rightBtns;
++
++    m_buttons.clear();
++    m_buttonsBounds = QRectF();
++    m_bridge->clearLastWindow();
++    m_decoration.reset();
++
++    if (m_buttonsList.isEmpty()) {
++        setImplicitSize(0, 0);
++        if (m_hasButtons) {
++            m_hasButtons = false;
++            emit hasButtonsChanged();
++        }
++        update();
++        return;
++    }
++
++    const auto plugins = KPluginMetaData::findPlugins(QStringLiteral("org.kde.kdecoration3"));
++    if (pluginId == QLatin1String("org.kde.kwin.aurorae")) {
++        for (const auto& md : plugins) {
++            if (md.pluginId() == QLatin1String("org.kde.kwin.aurorae.v2")) {
++                pluginId = QStringLiteral("org.kde.kwin.aurorae.v2");
++                break;
++            }
++        }
++    }
++
++    KPluginMetaData targetMd;
++    KPluginMetaData fallbackMd;
++    for (const auto& md : plugins) {
++        if (md.pluginId() == pluginId)
++            targetMd = md;
++        if (md.pluginId() == QLatin1String("org.kde.breeze"))
++            fallbackMd = md;
++    }
++    if (!targetMd.isValid())
++        targetMd = fallbackMd;
++
++    if (!targetMd.isValid()) {
++        setImplicitSize(0, 0);
++        if (m_hasButtons) {
++            m_hasButtons = false;
++            emit hasButtonsChanged();
++        }
++        update();
++        return;
++    }
++
++    if (kdecGroup.readEntry("BorderSizeAuto", true)) {
++        const QString recBorder = targetMd.rawData()
++            .value(QStringLiteral("org.kde.kdecoration3"))
++            .toObject()
++            .value(QStringLiteral("recommendedBorderSize"))
++            .toString(QStringLiteral("Normal"));
++        m_borderSize = parseBorderSize(recBorder);
++    }
++
++    auto factoryRes = KPluginFactory::loadFactory(targetMd);
++    if (!factoryRes.plugin)
++        return;
++
++    m_settings = std::make_shared<DecorationSettings>(m_bridge.get());
++
++    QVariantMap args({ { QStringLiteral("bridge"), QVariant::fromValue(static_cast<DecorationBridge*>(m_bridge.get())) } });
++    if (!themeName.isEmpty())
++        args.insert(QStringLiteral("theme"), themeName);
++
++    m_decoration.reset(factoryRes.plugin->create<Decoration>(nullptr, QVariantList({ args })));
++    if (!m_decoration)
++        return;
++
++    m_decoration->setSettings(m_settings);
++    m_decoration->create();
++    m_decoration->init();
++    if (auto st = m_decoration->nextState())
++        m_decoration->apply(st->clone());
++
++    connect(m_decoration.get(), &Decoration::nextStateChanged, this, [this](std::shared_ptr<DecorationState> st) {
++        if (m_decoration && st) {
++            m_decoration->apply(st->clone());
++            recalculateBounds();
++        }
++    });
++    connect(m_decoration.get(), &Decoration::damaged, this, [this](const QRegion&) {
++        update();
++    });
++    connect(m_decoration.get(), &Decoration::bordersChanged, this, &KdeDecorationButtons::recalculateBounds);
++    connect(m_decoration.get(), &Decoration::titleBarChanged, this, &KdeDecorationButtons::recalculateBounds);
++
++    const auto allBtns = m_decoration->findChildren<DecorationButton*>();
++    for (auto* b : allBtns) {
++        if (!b)
++            continue;
++        if (b->type() != DecorationButtonType::Minimize
++            && b->type() != DecorationButtonType::Maximize
++            && b->type() != DecorationButtonType::Close) {
++            continue;
++        }
++        if (b->type() == DecorationButtonType::Maximize)
++            b->setChecked(m_windowMaximized);
++
++        m_buttons.append(b);
++        connect(b, &DecorationButton::hoveredChanged, this, [this](bool) { update(); });
++        connect(b, &DecorationButton::pressedChanged, this, [this](bool) { update(); });
++        connect(b, &DecorationButton::checkedChanged, this, [this](bool) { update(); });
++        connect(b, &DecorationButton::geometryChanged, this, &KdeDecorationButtons::recalculateBounds);
++        connect(b, &DecorationButton::visibilityChanged, this, &KdeDecorationButtons::recalculateBounds);
++    }
++
++    recalculateBounds();
++}
++
++void KdeDecorationButtons::recalculateBounds() {
++    QRectF total;
++    for (const auto& b : m_buttons) {
++        if (b && b->isVisible() && b->geometry().isValid() && !b->geometry().isEmpty()) {
++            total = total.isNull() ? b->geometry() : total.united(b->geometry());
++        }
++    }
++    m_buttonsBounds = total;
++    if (!m_decoration || total.isEmpty()) {
++        setImplicitSize(0, 0);
++    } else {
++        const qreal tbHeight = std::max({ 30.0, m_decoration->borderTop(), m_decoration->titleBar().bottom(), total.bottom() });
++        if (m_side == QLatin1String("left")) {
++            const qreal winLeft = m_decoration->borderLeft();
++            setImplicitSize(std::max(1.0, std::ceil(total.right() - winLeft)), std::ceil(tbHeight));
++        } else {
++            const qreal winRight = m_decoration->rect().width() - m_decoration->borderRight();
++            setImplicitSize(std::max(1.0, std::ceil(winRight - total.left())), std::ceil(tbHeight));
++        }
++    }
++
++    const bool nowHas = !total.isEmpty();
++    if (m_hasButtons != nowHas) {
++        m_hasButtons = nowHas;
++        emit hasButtonsChanged();
++    }
++    update();
++}
++
++QPointF KdeDecorationButtons::decoOffset() const {
++    if (!m_decoration || m_buttonsBounds.isEmpty())
++        return QPointF();
++    if (m_side == QLatin1String("left")) {
++        return QPointF(-m_decoration->borderLeft(), 0.0);
++    }
++    const qreal winRight = m_decoration->rect().width() - m_decoration->borderRight();
++    return QPointF(width() - winRight, 0.0);
++}
++
++QPointF KdeDecorationButtons::toDecoPos(const QPointF& localPos) const {
++    return localPos - decoOffset();
++}
++
++void KdeDecorationButtons::clearHoverState() {
++    if (!m_decoration)
++        return;
++    QHoverEvent he(QEvent::HoverLeave, QPointF(-100, -100), QPointF(-100, -100), QPointF(-100, -100));
++    QCoreApplication::sendEvent(m_decoration.get(), &he);
++    update();
++}
++
++void KdeDecorationButtons::paint(QPainter* painter) {
++    if (!m_decoration || m_buttons.isEmpty() || m_buttonsBounds.isEmpty())
++        return;
++
++    painter->save();
++    painter->setRenderHint(QPainter::Antialiasing, true);
++    painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
++    painter->translate(decoOffset());
++
++    for (const auto& b : m_buttons) {
++        if (b && b->isVisible())
++            b->paint(painter, b->geometry());
++    }
++
++    painter->restore();
++}
++
++void KdeDecorationButtons::hoverEnterEvent(QHoverEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF pos = toDecoPos(event->position());
++    const QPointF oldPos = toDecoPos(event->oldPosF());
++    QHoverEvent he(QEvent::HoverEnter, pos, pos, oldPos, event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &he);
++    update();
++}
++
++void KdeDecorationButtons::hoverMoveEvent(QHoverEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF pos = toDecoPos(event->position());
++    const QPointF oldPos = toDecoPos(event->oldPosF());
++    QHoverEvent he(QEvent::HoverMove, pos, pos, oldPos, event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &he);
++    update();
++}
++
++void KdeDecorationButtons::hoverLeaveEvent(QHoverEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF oldPos = toDecoPos(event->oldPosF());
++    QHoverEvent he(QEvent::HoverLeave, QPointF(-100, -100), QPointF(-100, -100), oldPos,
++        event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &he);
++    update();
++}
++
++void KdeDecorationButtons::mousePressEvent(QMouseEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF pos = toDecoPos(event->position());
++    QMouseEvent me(QEvent::MouseButtonPress, pos, pos, event->globalPosition(),
++        event->button(), event->buttons(), event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &me);
++    event->accept();
++    update();
++}
++
++void KdeDecorationButtons::mouseMoveEvent(QMouseEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF pos = toDecoPos(event->position());
++    QMouseEvent me(QEvent::MouseMove, pos, pos, event->globalPosition(),
++        event->button(), event->buttons(), event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &me);
++    event->accept();
++    update();
++}
++
++void KdeDecorationButtons::mouseReleaseEvent(QMouseEvent* event) {
++    if (!m_decoration)
++        return;
++    const QPointF pos = toDecoPos(event->position());
++    QMouseEvent me(QEvent::MouseButtonRelease, pos, pos, event->globalPosition(),
++        event->button(), event->buttons(), event->modifiers(), event->pointingDevice());
++    QCoreApplication::sendEvent(m_decoration.get(), &me);
++    event->accept();
++    update();
++}
++
++} // namespace caelestia::services
+diff --git a/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.hpp b/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.hpp
+new file mode 100644
+index 00000000..54136d8d
+--- /dev/null
++++ b/shell/plugin/src/Caelestia/Services/kdedecorationbuttons.hpp
+@@ -0,0 +1,97 @@
++// SPDX-License-Identifier: GPL-3.0-only
++#pragma once
++
++#include <QList>
++#include <QPointer>
++#include <QQuickPaintedItem>
++#include <QRectF>
++#include <qqmlintegration.h>
++
++#include <KDecoration3/Decoration>
++#include <KDecoration3/DecorationButton>
++#include <KDecoration3/DecorationSettings>
++
++#include <memory>
++
++namespace caelestia::services {
++
++class KdeDecoBridge;
++
++class KdeDecorationButtons : public QQuickPaintedItem {
++    Q_OBJECT
++    QML_ELEMENT
++
++    Q_PROPERTY(QString side READ side WRITE setSide NOTIFY sideChanged)
++    Q_PROPERTY(bool windowActive READ windowActive WRITE setWindowActive NOTIFY windowActiveChanged)
++    Q_PROPERTY(bool windowMaximized READ windowMaximized WRITE setWindowMaximized NOTIFY windowMaximizedChanged)
++    Q_PROPERTY(bool hasButtons READ hasButtons NOTIFY hasButtonsChanged)
++
++public:
++    explicit KdeDecorationButtons(QQuickItem* parent = nullptr);
++    ~KdeDecorationButtons() override;
++
++    [[nodiscard]] QString side() const { return m_side; }
++    void setSide(const QString& side);
++
++    [[nodiscard]] bool windowActive() const { return m_windowActive; }
++    void setWindowActive(bool active);
++
++    [[nodiscard]] bool windowMaximized() const { return m_windowMaximized; }
++    void setWindowMaximized(bool maximized);
++
++    [[nodiscard]] bool hasButtons() const { return m_hasButtons; }
++
++    [[nodiscard]] QList<KDecoration3::DecorationButtonType> activeButtonsLeft() const;
++    [[nodiscard]] QList<KDecoration3::DecorationButtonType> activeButtonsRight() const;
++    [[nodiscard]] KDecoration3::BorderSize activeBorderSize() const { return m_borderSize; }
++
++    void notifyMinimizeRequested();
++    void notifyMaximizeRequested();
++    void notifyCloseRequested();
++
++    void componentComplete() override;
++    void paint(QPainter* painter) override;
++
++signals:
++    void minimizeRequested();
++    void maximizeRequested();
++    void closeRequested();
++    void sideChanged();
++    void windowActiveChanged();
++    void windowMaximizedChanged();
++    void hasButtonsChanged();
++
++protected:
++    void hoverEnterEvent(QHoverEvent* event) override;
++    void hoverMoveEvent(QHoverEvent* event) override;
++    void hoverLeaveEvent(QHoverEvent* event) override;
++    void mousePressEvent(QMouseEvent* event) override;
++    void mouseMoveEvent(QMouseEvent* event) override;
++    void mouseReleaseEvent(QMouseEvent* event) override;
++
++private slots:
++    void reloadDecoration();
++    void recalculateBounds();
++
++private:
++    void clearHoverState();
++    [[nodiscard]] QPointF decoOffset() const;
++    [[nodiscard]] QPointF toDecoPos(const QPointF& localPos) const;
++
++    QString m_side = QStringLiteral("right");
++    bool m_windowActive = true;
++    bool m_windowMaximized = false;
++    bool m_hasButtons = false;
++    bool m_completed = false;
++
++    QList<KDecoration3::DecorationButtonType> m_buttonsList;
++    KDecoration3::BorderSize m_borderSize = KDecoration3::BorderSize::Normal;
++
++    std::unique_ptr<KdeDecoBridge> m_bridge;
++    std::shared_ptr<KDecoration3::DecorationSettings> m_settings;
++    std::unique_ptr<KDecoration3::Decoration> m_decoration;
++    QList<QPointer<KDecoration3::DecorationButton>> m_buttons;
++    QRectF m_buttonsBounds;
++};
++
++} // namespace caelestia::services
+-- 
+2.56.1
+

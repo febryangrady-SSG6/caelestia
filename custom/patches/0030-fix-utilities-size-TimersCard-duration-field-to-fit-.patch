@@ -1,0 +1,36 @@
+From a37d7bdfc5128bebace05ad293e83a80ab64134a Mon Sep 17 00:00:00 2001
+From: Febryan Grady <febryan.grady@binus.edu>
+Date: Sat, 21 Nov 2026 22:17:02 +0700
+Subject: [PATCH 30/47] fix(utilities): size TimersCard duration field to fit
+ placeholder text
+
+---
+ shell/modules/utilities/cards/TimersCard.qml | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/shell/modules/utilities/cards/TimersCard.qml b/shell/modules/utilities/cards/TimersCard.qml
+index 65d59072..80686daa 100644
+--- a/shell/modules/utilities/cards/TimersCard.qml
++++ b/shell/modules/utilities/cards/TimersCard.qml
+@@ -195,10 +195,17 @@ StyledRect {
+                 Layout.fillWidth: true
+                 spacing: Tokens.spacing.small
+ 
++                TextMetrics {
++                    id: digitsPlaceholderMetrics
++
++                    font: digitsField.font
++                    text: digitsField.placeholderText
++                }
++
+                 StyledTextField {
+                     id: digitsField
+ 
+-                    Layout.preferredWidth: 96
++                    Layout.preferredWidth: Math.max(96, Math.ceil(digitsPlaceholderMetrics.width) + leftPadding + rightPadding)
+                     horizontalAlignment: TextInput.AlignHCenter
+                     placeholderText: qsTr("300 = 3:00")
+                     onAccepted: root.beginTyped()
+-- 
+2.56.1
+
